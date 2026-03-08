@@ -1,15 +1,9 @@
-"""
-from importlib import reload
-from coophou import server
-reload(server)
-server.addCallbacks()
-"""
-
 import json
 
 import hou
 
 from .tcp import TcpServer
+from .common import log
 
 EVENT_TYPES = [
     hou.nodeEventType.BeingDeleted,
@@ -27,22 +21,23 @@ EVENT_TYPES = [
 ]
 EVENT_BUFFER = []
 IS_PROCESSING = False
+SERVER = None
 
 
-if hasattr(hou.session, "coophou_server"):
-    SERVER = hou.session.coophou_server
-else:
-    SERVER = TcpServer()
-    hou.session.coophou_server = SERVER
-
-
-def _pprint(t, msg):
-    msg = f"  - {t}".ljust(9) + " | " + str(msg)
-    print(msg)
+def _startServer():
+    global SERVER
+    if hasattr(hou.session, "coophou_server"):
+        SERVER = hou.session.coophou_server
+    else:
+        SERVER = TcpServer()
+        hou.session.coophou_server = SERVER
 
 
 def sendPayload(eventType, event):
     global SERVER
+    if not SERVER:
+        print("SERVER not initialized, cannot send payload")
+        return
 
     from importlib import reload
     from . import eventTranslation
@@ -101,7 +96,7 @@ def processEvents():
             node = hou.node(nodePath)
 
             eventType = event["event_type"].split(".")[-1]
-            _pprint(eventType, event)
+            log(eventType, event)
 
             if eventType == "ChildCreated":
                 # Gotta wait until the next event loop to check for immediate
@@ -145,7 +140,7 @@ def clientCallback(**kwargs):
     EVENT_BUFFER.append(eventData)
 
 
-def addCallbacks():
+def _startWatcher():
     for c in hou.ui.eventLoopCallbacks():
         hou.ui.removeEventLoopCallback(c)
 
@@ -154,3 +149,8 @@ def addCallbacks():
     for node in hou.root().allNodes():
         node.removeAllEventCallbacks()
         node.addEventCallback(EVENT_TYPES, clientCallback)
+
+
+def start():
+    _startServer()
+    _startWatcher()

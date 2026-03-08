@@ -1,4 +1,3 @@
-import sys
 import os
 import subprocess
 import shutil
@@ -12,24 +11,16 @@ def launchHoudiniSessions(sessionCount: int):
         )
         return
 
-    scriptDir = os.path.dirname(sys.argv[0])
-    scriptPath = os.path.join(scriptDir, "setupHouWindow.py")
-
     for i in range(sessionCount):
-        command = [
-            "houdini",
-            scriptPath,
-            "--column",
-            str(i),
-            "--columnCount",
-            str(sessionCount),
-        ]
 
-        if i == 0:
-            command.append("--asServer")
+        env = os.environ.copy()
+        env["COOPHOU_TESTING"] = "1"
+        env["COOPHOU_TESTING_COLUMN"] = str(i)
+        env["COOPHOU_TESTING_COLUMN_COUNT"] = str(sessionCount)
+        env["COOPHOU_TESTING_AS_SERVER"] = "1" if i == 0 else "0"
 
         print(f"Launching Houdini session {i + 1}/{sessionCount}")
-        subprocess.Popen(command)
+        subprocess.Popen(["houdini", "-desktop", "CoopHouTesting"], env=env)
 
 
 if __name__ == "__main__":
