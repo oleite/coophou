@@ -238,3 +238,121 @@ class EventAppearanceChanged(Event):
             return Event.errMissingNode(payload["node"])
 
         node.setFromData(payload["data"])
+
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+
+
+class Overlay(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(
+            Qt.FramelessWindowHint
+            | Qt.Tool
+            | Qt.WindowTransparentForInput
+        )
+
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+
+        self.pixmap1 = hou.qt.Icon("BUTTONS_editable", width=32, height=32).pixmap(32, 32)
+        self.pixmap2 = hou.qt.Icon("TOP_sendcommand", width=32, height=32).pixmap(32, 32)
+
+        self.cursor = QLabel("Overlay", self)
+        self.cursor.setPixmap(self.pixmap1)
+        self.cursor.setStyleSheet("color: white; font-size: 24px;")
+        self.show()
+
+    def setCursorPos(self, pos, precise=True):
+        self.cursor.move(pos - QPoint(self.cursor.width() // 2, self.cursor.height() // 2))
+        self.cursor.setPixmap(self.pixmap1 if precise else self.pixmap2)
+
+class EventNetworkCursorMoved(Event):
+    eventType = "NetworkCursorMoved"
+    _overlay = None
+
+    @staticmethod
+    def extractPayload(event):
+        ne = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+        if not ne or not ne.isUnderCursor():
+            return {}
+        return {
+            "pos": tuple(ne.cursorPosition()),
+        }
+
+    @staticmethod
+    def applyPayload(payload):
+        pos = payload.get("pos")
+        if pos:
+            pos = hou.Vector2(pos)
+
+        hou.ui.postEventCallback(lambda: EventNetworkCursorMoved.refreshOverlay(pos))
+
+    @classmethod
+    def refreshOverlay(cls, cursorPos):
+
+        ne = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
+        if not ne:
+            return
+
+        geo = ne.qtScreenGeometry()
+        size = ne.screenBounds().size()
+        geo.setX(geo.x() + geo.width() - size.x())
+        geo.setY(geo.y() + geo.height() - size.y())
+        geo.setSize(QSize(size.x(), size.y()))
+        
+        if not getattr(hou.session, "_NE_OVERLAY", None):
+            hou.session._NE_OVERLAY = Overlay(ne.qtParentWindow())
+        
+        hou.session._NE_OVERLAY.setGeometry(geo)
+
+        if not cursorPos:
+            hou.session._NE_OVERLAY.cursor.hide()
+            return
+        hou.session._NE_OVERLAY.cursor.show()
+
+        bounds = ne.visibleBounds()
+        precise = True
+        if not bounds.contains(cursorPos):
+            cursorPos = bounds.closestPoint(cursorPos)
+            precise = False
+
+        pos = ne.posToScreen(cursorPos)
+        pos = QPoint(pos.x(), ne.screenBounds().size().y() - pos.y())
+
+        hou.session._NE_OVERLAY.setCursorPos(pos, precise=precise)
+
+
+class EventViewportCameraChanged(Event):
+    eventType = "ViewportCameraChanged"
+
+    @staticmethod
+    def extractPayload(event):
+        sv = hou.ui.paneTabOfType(hou.paneTabType.SceneViewer)
+        if not sv:
+            return
+        vp = sv.curViewport()
+        if not vp:
+            return
+        return {
+            "mat": tuple(vp.viewTransform().asTuple()),
+        }
+
+    @staticmethod
+    def applyPayload(payload):
+        mat = payload.get("mat")
+        if mat is None:
+            return
+
+        hou.ui.postEventCallback(lambda: EventViewportCameraChanged.refreshCamera(mat))
+
+    def refreshCamera(mat):
+        try:
+            cam = hou.node("/obj/_users_view")
+            if not cam:
+                cam = hou.node("/obj").createNode("cam", "_users_view")
+            cam.hide(False)
+            cam.setWorldTransform(hou.Matrix4(mat))
+        except Exception as e:
+            print(f"Error refreshing camera: {e}")

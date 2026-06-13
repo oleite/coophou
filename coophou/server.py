@@ -66,6 +66,10 @@ def afterNodeCreated(nodePath):
 
 
 def processEvents():
+    # TODO: Move 
+    sendPayload("NetworkCursorMoved", None)
+    sendPayload("ViewportCameraChanged", None)
+
     global EVENT_BUFFER, IS_PROCESSING
 
     if IS_PROCESSING:

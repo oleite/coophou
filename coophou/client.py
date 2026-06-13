@@ -15,8 +15,13 @@ def onDataReceived(payload):
     eventType = payload.get("event_type")
     log(eventType, payload)
 
-    eventTranslation.getEvent(eventType).applyPayload(payload)
+    apply = lambda: eventTranslation.getEvent(eventType).applyPayload(payload)
 
+    # Delay calling apply until the UI is idle to avoid conflicts with ongoing operations.
+    if hou.isUIAvailable():
+        hou.ui.postEventCallback(apply)
+    else:
+        apply()
 
 CLIENT = None
 
