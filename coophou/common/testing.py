@@ -5,7 +5,7 @@ import argparse
 from PySide6.QtCore import QMargins
 import hou
 
-import coophou
+from coophou import client
 
 
 def resizeWindow(window, column: int, columnCount: int = 2):
@@ -26,15 +26,10 @@ def resizeWindow(window, column: int, columnCount: int = 2):
     window.setGeometry(x, y, width, height)
 
 
-def start(column: int, columnCount: int, asServer: bool = False):
+def start(column: int, columnCount: int):
     resizeWindow(hou.qt.mainWindow(), column, columnCount)
-
     hou.ui.setHideAllMinimizedStowbars(True)
-
-    if asServer:
-        coophou.server.start()
-    else:
-        coophou.client.start()
+    client.start()
 
 
 def startFromEnv():
@@ -43,6 +38,5 @@ def startFromEnv():
 
     column = int(os.getenv("COOPHOU_TESTING_COLUMN", "0"))
     columnCount = int(os.getenv("COOPHOU_TESTING_COLUMN_COUNT", "2"))
-    asServer = os.getenv("COOPHOU_TESTING_AS_SERVER", "0") == "1"
 
-    start(column, columnCount, asServer)
+    start(column, columnCount)

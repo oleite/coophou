@@ -1,3 +1,3 @@
-from coophou.testing import startFromEnv
+from coophou.common.testing import startFromEnv
 
 startFromEnv()

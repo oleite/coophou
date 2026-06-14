@@ -1,4 +1,5 @@
 import hou
+from . import networkOverlay
 
 
 class Event:
@@ -33,7 +34,6 @@ class EventPositionChanged(Event):
     @staticmethod
     def extractPayload(event):
         nodePath = event["node"]
-        print(event)
         return {
             "node": nodePath,
             "pos": tuple(hou.node(nodePath).position()),
@@ -96,8 +96,6 @@ class EventChildCreated(Event):
 
     @staticmethod
     def extractPayload(event):
-        print("\n" * 10)
-
         nodeType = hou.node(event["child_node"]).type().name()
         return {
             "node": event["child_node"],
@@ -106,15 +104,17 @@ class EventChildCreated(Event):
 
     @staticmethod
     def applyPayload(payload):
-        print("\n" * 10)
+        if hou.node(payload["node"]):
+            print("Error creating child: Node already exists!")
+            return
 
-        parentPath = "/".join(payload["node"].split("/")[:-1])
+        parentPath, _, nodeName = payload["node"].rpartition("/")
 
         parentNode = hou.node(parentPath)
         if not parentNode:
             return Event.errMissingNode(parentPath)
-
-        parentNode.createNode(payload["type"], node_name=payload["node"].split("/")[-1])
+        
+        parentNode.createNode(payload["type"], node_name=nodeName)
 
 
 class EventChildDeleted(Event):
@@ -136,31 +136,31 @@ class EventChildDeleted(Event):
         node.destroy()
 
 
-class EventChildSelectionChanged(Event):
-    eventType = "ChildSelectionChanged"
+# class EventChildSelectionChanged(Event):
+#     eventType = "ChildSelectionChanged"
 
-    @staticmethod
-    def extractPayload(event):
-        node = hou.node(event["node"])
-        selection = [item.name() for item in node.selectedItems()]
-        return {
-            "node": event["node"],
-            "selection": selection,
-        }
+#     @staticmethod
+#     def extractPayload(event):
+#         node = hou.node(event["node"])
+#         selection = [item.name() for item in node.selectedItems()]
+#         return {
+#             "node": event["node"],
+#             "selection": selection,
+#         }
 
-    @staticmethod
-    def applyPayload(payload):
-        node = hou.node(payload["node"])
+#     @staticmethod
+#     def applyPayload(payload):
+#         node = hou.node(payload["node"])
 
-        if not node:
-            return Event.errMissingNode(payload["node"])
+#         if not node:
+#             return Event.errMissingNode(payload["node"])
 
-        for item in node.allItems():
-            selected = item.name() in payload["selection"]
-            if selected:
-                item.setColor(hou.Color((1, 0, 0)))
-            else:
-                item.setColor(hou.Color((0.8, 0.8, 0.8)))
+#         for item in node.allItems():
+#             selected = item.name() in payload["selection"]
+#             if selected:
+#                 item.setColor(hou.Color((1, 0, 0)))
+#             else:
+#                 item.setColor(hou.Color((0.8, 0.8, 0.8)))
 
 
 class EventCustomNodeDataChanged(Event):
@@ -212,61 +212,33 @@ class EventInputRewired(Event):
         node.setFromData(payload["data"])
 
 
-class EventAppearanceChanged(Event):
-    eventType = "AppearanceChanged"
+# class EventAppearanceChanged(Event):
+#     eventType = "AppearanceChanged"
 
-    @staticmethod
-    def extractPayload(event):
-        nodePath = event["node"]
-        return {
-            "node": nodePath,
-            "data": hou.node(nodePath).asData(
-                nodes_only=True,
-                children=False,
-                editables=False,
-                inputs=True,
-                position=True,
-                parms=False,
-            ),
-        }
+#     @staticmethod
+#     def extractPayload(event):
+#         nodePath = event["node"]
+#         return {
+#             "node": nodePath,
+#             "data": hou.node(nodePath).asData(
+#                 nodes_only=True,
+#                 children=False,
+#                 editables=False,
+#                 inputs=True,
+#                 position=True,
+#                 parms=False,
+#             ),
+#         }
 
-    @staticmethod
-    def applyPayload(payload):
-        node = hou.node(payload["node"])
+#     @staticmethod
+#     def applyPayload(payload):
+#         node = hou.node(payload["node"])
 
-        if not node:
-            return Event.errMissingNode(payload["node"])
+#         if not node:
+#             return Event.errMissingNode(payload["node"])
 
-        node.setFromData(payload["data"])
+#         node.setFromData(payload["data"])
 
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-
-
-class Overlay(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowFlags(
-            Qt.FramelessWindowHint
-            | Qt.Tool
-            | Qt.WindowTransparentForInput
-        )
-
-        self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setAttribute(Qt.WA_ShowWithoutActivating)
-
-        self.pixmap1 = hou.qt.Icon("BUTTONS_editable", width=32, height=32).pixmap(32, 32)
-        self.pixmap2 = hou.qt.Icon("TOP_sendcommand", width=32, height=32).pixmap(32, 32)
-
-        self.cursor = QLabel("Overlay", self)
-        self.cursor.setPixmap(self.pixmap1)
-        self.cursor.setStyleSheet("color: white; font-size: 24px;")
-        self.show()
-
-    def setCursorPos(self, pos, precise=True):
-        self.cursor.move(pos - QPoint(self.cursor.width() // 2, self.cursor.height() // 2))
-        self.cursor.setPixmap(self.pixmap1 if precise else self.pixmap2)
 
 class EventNetworkCursorMoved(Event):
     eventType = "NetworkCursorMoved"
@@ -287,41 +259,7 @@ class EventNetworkCursorMoved(Event):
         if pos:
             pos = hou.Vector2(pos)
 
-        hou.ui.postEventCallback(lambda: EventNetworkCursorMoved.refreshOverlay(pos))
-
-    @classmethod
-    def refreshOverlay(cls, cursorPos):
-
-        ne = hou.ui.paneTabOfType(hou.paneTabType.NetworkEditor)
-        if not ne:
-            return
-
-        geo = ne.qtScreenGeometry()
-        size = ne.screenBounds().size()
-        geo.setX(geo.x() + geo.width() - size.x())
-        geo.setY(geo.y() + geo.height() - size.y())
-        geo.setSize(QSize(size.x(), size.y()))
-        
-        if not getattr(hou.session, "_NE_OVERLAY", None):
-            hou.session._NE_OVERLAY = Overlay(ne.qtParentWindow())
-        
-        hou.session._NE_OVERLAY.setGeometry(geo)
-
-        if not cursorPos:
-            hou.session._NE_OVERLAY.cursor.hide()
-            return
-        hou.session._NE_OVERLAY.cursor.show()
-
-        bounds = ne.visibleBounds()
-        precise = True
-        if not bounds.contains(cursorPos):
-            cursorPos = bounds.closestPoint(cursorPos)
-            precise = False
-
-        pos = ne.posToScreen(cursorPos)
-        pos = QPoint(pos.x(), ne.screenBounds().size().y() - pos.y())
-
-        hou.session._NE_OVERLAY.setCursorPos(pos, precise=precise)
+        hou.ui.postEventCallback(lambda: networkOverlay.refreshOverlay(pos))
 
 
 class EventViewportCameraChanged(Event):

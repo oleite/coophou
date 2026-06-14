@@ -4,7 +4,7 @@ import shutil
 import argparse
 
 
-def launchHoudiniSessions(sessionCount: int):
+def launchClients(sessionCount: int):
     if not shutil.which("houdini"):
         print(
             "Error: 'houdini' command not found. Please ensure Houdini is installed and added to your PATH."
@@ -17,7 +17,7 @@ def launchHoudiniSessions(sessionCount: int):
         env["COOPHOU_TESTING"] = "1"
         env["COOPHOU_TESTING_COLUMN"] = str(i)
         env["COOPHOU_TESTING_COLUMN_COUNT"] = str(sessionCount)
-        env["COOPHOU_TESTING_AS_SERVER"] = "1" if i == 0 else "0"
+        # env["COOPHOU_TESTING_AS_SERVER"] = "1" if i == 0 else "0"
 
         print(f"Launching Houdini session {i + 1}/{sessionCount}")
         subprocess.Popen(["houdini", "-desktop", "CoopHouTesting"], env=env)
@@ -30,4 +30,4 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    launchHoudiniSessions(args.sessions)
+    launchClients(args.sessions)

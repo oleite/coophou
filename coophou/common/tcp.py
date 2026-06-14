@@ -31,6 +31,7 @@ class TcpServer(QObject):
 
         self.tcpServer.newConnection.connect(self.handleNewConnection)
 
+    def start(self):
         if self.tcpServer.listen(QHostAddress.SpecialAddress.LocalHost, PORT):
             print(f"Server listening on port {PORT}...")
         else:
@@ -77,6 +78,7 @@ class TcpClient(QObject):
         self.tcpSocket.connected.connect(self.handleConnection)
         self.tcpSocket.readyRead.connect(self.readData)
 
+    def start(self):
         self.tcpSocket.connectToHost("127.0.0.1", PORT)
 
     @Slot()
@@ -89,6 +91,10 @@ class TcpClient(QObject):
 
     @Slot(str)
     def sendMessage(self, message):
-        if self.tcpSocket.state() == QTcpSocket.SocketState.ConnectedState:
-            self.tcpSocket.write(message.encode("utf-8"))
-            self.tcpSocket.flush()
+        if self.tcpSocket.state() != QTcpSocket.SocketState.ConnectedState:
+            print("ERROR: Can't send message, not connected to Server")
+            return
+
+        self.tcpSocket.write(message.encode("utf-8"))
+        self.tcpSocket.flush()
+        print("sent")

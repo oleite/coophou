@@ -46,8 +46,14 @@ cp coophou/coophou.json "$PACKAGES_PATH/coophou.json"
 
 ## Development
 
-For testing, you can use this helper to launch side-by-side Houdini sessions, the first one as server, the rest as clients:
+To start the server, run:
+
+```
+python -m coophou.server
+```
+
+For testing, you can use this helper to launch side-by-side Houdini sessions:
 
 ```bat
-python scripts/launchHoudiniSessions.py --sessions 2
+python scripts/launchClients.py --sessions 2
 ```
