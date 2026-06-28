@@ -5,14 +5,13 @@ from importlib import reload
 import hou
 
 from PySide6.QtCore import *
-from PySide6.QtNetwork import QTcpServer, QHostAddress, QTcpSocket
+from PySide6.QtNetwork import QAbstractSocket, QTcpServer, QHostAddress, QTcpSocket
 
 from ..common import *
 from . import sender, receiver
 
 
 class CoopHouClient(QObject):
-    disconnected = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -35,6 +34,7 @@ class CoopHouClient(QObject):
         self.tcpSocket.readyRead.connect(self.onReadyRead)
 
         self.connecting = False
+        self.reconnect = True
 
         self.udpClient = (
             None  # TODO: Implement UDP client for discovery and broadcasting
@@ -69,12 +69,16 @@ class CoopHouClient(QObject):
 
     def onDisconnected(self):
         print("DISCONNECTED FROM SERVER.")
-        self.disconnected.emit()
+        if self.reconnect:
+            self.start()
 
     def onError(self, e):
         print(f"ERROR: {e}")
-        if self.tcpSocket.state() != QTcpSocket.SocketState.ConnectedState:
-            self.disconnected.emit()
+
+        if e == QAbstractSocket.SocketError.ConnectionRefusedError:
+            self.connecting = False
+            if self.reconnect:
+                self.start()
 
     def onReadyRead(self):
         packet = readData(self.tcpSocket)
@@ -122,5 +126,4 @@ def start():
     global CLIENT
     if not CLIENT:
         CLIENT = CoopHouClient()
-    CLIENT.disconnected.connect(lambda: hou.ui.postEventCallback(start))
     CLIENT.start()

@@ -1,3 +1,12 @@
+# C++
+/dso/
+/build/
+
+*.exp
+*.lib
+*.o
+
+
 # Python
 __pycache__/
 *.py[cod]
@@ -31,8 +40,11 @@ htmlcov/
 houdini_temp/
 
 # IDE
-.vscode/
-.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json.idea/
 *.swp
 *.swo
 

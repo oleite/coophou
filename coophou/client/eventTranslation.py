@@ -12,12 +12,25 @@ class Event:
 
     @staticmethod
     def extractPayload(event):
+        # Called on the SENDER client to determine the data
+        # to be sent to the server.
+
         return {"unknown_event": event}
 
     @staticmethod
     def applyPayload(payload):
+        # Called on the RECEIVER client to apply the changes
+        # received from the server.
+
         print("    not implemented yet")
-        pass
+
+    @staticmethod
+    def storePayload(payload):
+        # Called on the SERVER to store the global scene graph
+        # state to be easily recalled later.
+        # The data provided here will update the global dict
+
+        print("    not implemented yet")
 
     @classmethod
     def errMissingNode(cls, nodePath):

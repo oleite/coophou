@@ -39,12 +39,12 @@ class ClientSender(QObject):
 
         hou.ui.addEventLoopCallback(self.processEvents)
 
-        for node in hou.root().allNodes():
-            node.removeAllEventCallbacks()
-            self.addCallbacks(node)
+        self.addCallbacks(hou.root())
 
     def addCallbacks(self, node):
-        node.addEventCallback(EVENT_TYPES, self.callback)
+         for n in node.allNodes():
+            n.removeAllEventCallbacks()
+            n.addEventCallback(EVENT_TYPES, self.callback)
 
     def temporarilyIgnoreNode(self, path):
         if not path:
@@ -148,8 +148,7 @@ class ClientSender(QObject):
 
         # Any nodes created at the same time as the parent won't trigger
         # their own ChildCreated event, so we have to add callbacks to them manually.
-        for n in node.allNodes():
-            self.addCallbacks(n)
+        self.addCallbacks(node)
 
         self.eventBuffer.append(
             {
