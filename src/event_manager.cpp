@@ -1,70 +1,110 @@
 #include "event_manager.h"
 
-#define REGISTER_EVENT(enumVal, func) \
-    eventHandlers[static_cast<size_t>(OP_EventType::enumVal)] = [this](const void *d) { return func(d); };
-
 EventManager::EventManager()
 {
-    REGISTER_EVENT(OP_CHILD_CREATED, onChildCreated)
-    REGISTER_EVENT(OP_NODE_DELETED, onNodeDeleted)
-    REGISTER_EVENT(OP_NAME_CHANGED, onNameChanged)
-    REGISTER_EVENT(OP_INPUT_REWIRED, onInputRewired)
-    REGISTER_EVENT(OP_FLAG_CHANGED, onFlagChanged)
-    REGISTER_EVENT(OP_PARM_CHANGED, onParmChanged)
-    REGISTER_EVENT(OP_PARM_ANIMATED, onParmAnimated)
-    REGISTER_EVENT(OP_CHPLAYBACK_CHANGED, onChPlaybackChanged)
-    REGISTER_EVENT(OP_SPAREPARM_MODIFIED, onSpareParmModified)
-    REGISTER_EVENT(OP_MULTIPARM_MODIFIED, onMultiParmModified)
 }
 
-#undef REGISTER_EVENT
-
-QJsonObject EventManager::createPayload(OP_EventType type, const void *data)
+QJsonObject EventManager::createPayload(OP_Node *node, OP_EventType reason, void *data)
 {
-    size_t index = static_cast<size_t>(type);
+    switch (reason)
+    {
+    case OP_EventType::OP_CHILD_CREATED:
+        return onChildCreated(node, data);
 
-    if (index >= eventHandlers.size() || !eventHandlers[index])
-        return QJsonObject(); 
+    case OP_EventType::OP_NODE_DELETED:
+        return onNodeDeleted(node, data);
 
-    return eventHandlers[index](data);
+    case OP_EventType::OP_NAME_CHANGED:
+        return onNameChanged(node, data);
+
+    case OP_EventType::OP_INPUT_REWIRED:
+        return onInputRewired(node, data);
+
+    case OP_EventType::OP_FLAG_CHANGED:
+        return onFlagChanged(node, data);
+
+    case OP_EventType::OP_PARM_CHANGED:
+        return onParmChanged(node, data);
+
+    case OP_EventType::OP_PARM_ANIMATED:
+        return onParmAnimated(node, data);
+
+    case OP_EventType::OP_CHPLAYBACK_CHANGED:
+        return onChPlaybackChanged(node, data);
+
+    case OP_EventType::OP_SPAREPARM_MODIFIED:
+        return onSpareParmModified(node, data);
+
+    case OP_EventType::OP_MULTIPARM_MODIFIED:
+        return onMultiParmModified(node, data);
+
+    default:
+        return {};
+    }
 }
 
-QJsonObject EventManager::onChildCreated(const void *data)
+QJsonObject EventManager::onChildCreated(OP_Node *node, void *data)
 {
+    if (!node || !data)
+        return {};
+
+    auto *child = static_cast<OP_Node *>(data);
+
+    UT_String parentPath;
+    UT_String childPath;
+
+    node->getFullPath(parentPath);
+    child->getFullPath(childPath);
+
+    const QString childPathString = QString::fromUtf8(childPath.c_str());
+    const QString childName = childPathString.section('/', -1);
+
+    return {
+        {"event", "child_created"},
+        {"parent_path", QString::fromUtf8(parentPath.c_str())},
+        {"child_name", childName},
+    };
 }
 
-QJsonObject EventManager::onNodeDeleted(const void *data)
+QJsonObject EventManager::onNodeDeleted(OP_Node *node, void *data)
 {
+    return {};
 }
 
-QJsonObject EventManager::onNameChanged(const void *data)
+QJsonObject EventManager::onNameChanged(OP_Node *node, void *data)
 {
+    return {};
 }
 
-QJsonObject EventManager::onInputRewired(const void *data)
+QJsonObject EventManager::onInputRewired(OP_Node *node, void *data)
 {
+    return {};
 }
 
-QJsonObject EventManager::onFlagChanged(const void *data)
+QJsonObject EventManager::onFlagChanged(OP_Node *node, void *data)
 {
+    return {};
 }
 
-QJsonObject EventManager::onParmChanged(const void *data)
+QJsonObject EventManager::onParmChanged(OP_Node *node, void *data)
 {
+    return {};
+}
+QJsonObject EventManager::onParmAnimated(OP_Node *node, void *data)
+{
+    return {};
 }
 
-QJsonObject EventManager::onParmAnimated(const void *data)
+QJsonObject EventManager::onChPlaybackChanged(OP_Node *node, void *data)
 {
+    return {};
+}
+QJsonObject EventManager::onSpareParmModified(OP_Node *node, void *data)
+{
+    return {};
 }
 
-QJsonObject EventManager::onChPlaybackChanged(const void *data)
+QJsonObject EventManager::onMultiParmModified(OP_Node *node, void *data)
 {
-}
-
-QJsonObject EventManager::onSpareParmModified(const void *data)
-{
-}
-
-QJsonObject EventManager::onMultiParmModified(const void *data)
-{
+    return {};
 }
