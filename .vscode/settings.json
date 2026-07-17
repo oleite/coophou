@@ -1,4 +1,17 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "terminal.integrated.env.linux": {
+        "GTEST_COLOR": "1"
+    },
+    "terminal.integrated.env.windows": {
+        "GTEST_COLOR": "1"
+    },
+    "terminal.integrated.env.osx": {
+        "GTEST_COLOR": "1"
+    },
+    "cmake.ctestArgs": [
+        "--verbose"
+    ],
+    "C_Cpp.dimInactiveRegions": true
 }

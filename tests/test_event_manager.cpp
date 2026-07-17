@@ -1,6 +1,7 @@
 #include "houdini_fixture.h"
 
 #include "event_manager.h"
+#include "watcher.cpp"
 
 #include <OP/OP_Network.h>
 #include <OP/OP_Node.h>
@@ -11,17 +12,17 @@
 
 namespace
 {
-std::string jsonString(const QJsonObject &json, const char *key)
-{
-    return json.value(key).toString().toStdString();
-}
+    std::string jsonString(const QJsonObject &json, const char *key)
+    {
+        return json.value(key).toString().toStdString();
+    }
 
-std::string nodePath(OP_Node *node)
-{
-    UT_String path;
-    node->getFullPath(path);
-    return path.c_str();
-}
+    std::string nodePath(OP_Node *node)
+    {
+        UT_String path;
+        node->getFullPath(path);
+        return path.c_str();
+    }
 }
 
 TEST_F(HoudiniFixture, CanCreateObjectNodeWithoutHipFile)
@@ -74,4 +75,20 @@ TEST_F(HoudiniFixture, UnknownEventReturnsEmptyPayload)
         nullptr);
 
     EXPECT_TRUE(json.isEmpty());
+}
+
+TEST_F(HoudiniFixture, SanityCheck)
+{
+
+    OP_Network *obj = objectNetwork();
+
+    ASSERT_NE(obj, nullptr);
+
+    ASSERT_TRUE(Watcher::start());
+
+
+    OP_Node *child = createObjectNode("geo", "geo_child");
+
+    ASSERT_NE(child, nullptr);
+
 }

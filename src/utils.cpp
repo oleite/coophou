@@ -20,8 +20,7 @@ bool compressString(const std::string &input, std::string &output)
         input.data(),
         compressedLength,
         stringSize,
-        zlibCompressionLevel
-    );
+        zlibCompressionLevel);
 
     if (!compressedBufferPtr || compressedLength <= 0)
     {

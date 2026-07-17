@@ -30,10 +30,12 @@ find_package(Houdini REQUIRED)
 add_library(CoopHouCore STATIC
     src/event_manager.cpp
     src/utils.cpp
+    src/watcher.cpp
 
     # Headers (optional, but nice for IDEs)
     src/event_manager.h
     src/utils.h
+    src/watcher.h
 )
 
 target_include_directories(CoopHouCore
