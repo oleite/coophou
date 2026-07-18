@@ -1,110 +1,151 @@
 #include "event_manager.h"
 
-EventManager::EventManager()
+#include <SYS/SYS_Version.h>
+#include <OP/OP_Network.h>
+#include <UT/UT_HDKVersion.h>
+#include <UT/UT_String.h>
+#include <UT/UT_StringHolder.h>
+#include <UT/UT_UndoManager.h>
+
+#include <QtCore/QDateTime>
+#include <QtCore/QJsonValue>
+#include <QtCore/QtGlobal>
+
+namespace
 {
+constexpr int TRACE_VERSION = 1;
+constexpr const char *ENTITY_ID_KEY = "coophou.entity_id";
+
+QString platformName()
+{
+#if defined(_WIN32)
+    return "windows";
+#elif defined(__APPLE__)
+    return "macos";
+#elif defined(__linux__)
+    return "linux";
+#else
+    return "unknown";
+#endif
 }
 
-QJsonObject EventManager::createPayload(OP_Node *node, OP_EventType reason, void *data)
+QString undoState()
 {
-    switch (reason)
-    {
-    case OP_EventType::OP_CHILD_CREATED:
-        return onChildCreated(node, data);
-
-    case OP_EventType::OP_NODE_DELETED:
-        return onNodeDeleted(node, data);
-
-    case OP_EventType::OP_NAME_CHANGED:
-        return onNameChanged(node, data);
-
-    case OP_EventType::OP_INPUT_REWIRED:
-        return onInputRewired(node, data);
-
-    case OP_EventType::OP_FLAG_CHANGED:
-        return onFlagChanged(node, data);
-
-    case OP_EventType::OP_PARM_CHANGED:
-        return onParmChanged(node, data);
-
-    case OP_EventType::OP_PARM_ANIMATED:
-        return onParmAnimated(node, data);
-
-    case OP_EventType::OP_CHPLAYBACK_CHANGED:
-        return onChPlaybackChanged(node, data);
-
-    case OP_EventType::OP_SPAREPARM_MODIFIED:
-        return onSpareParmModified(node, data);
-
-    case OP_EventType::OP_MULTIPARM_MODIFIED:
-        return onMultiParmModified(node, data);
-
-    default:
-        return {};
-    }
+    return UTperformingUndoRedo() ? "undo_or_redo" : "not_undo_redo";
+}
 }
 
-QJsonObject EventManager::onChildCreated(OP_Node *node, void *data)
+QString
+EventManager::nodePath(const OP_Node *node)
 {
-    if (!node || !data)
+    if (!node)
         return {};
+    UT_String path;
+    node->getFullPath(path);
+    return QString::fromUtf8(path.c_str());
+}
 
-    auto *child = static_cast<OP_Node *>(data);
+QString
+EventManager::entityId(const OP_Node *node)
+{
+    if (!node)
+        return {};
+    UT_StringHolder value;
+    if (!node->getUserData(ENTITY_ID_KEY, value))
+        return {};
+    return QString::fromUtf8(value.c_str());
+}
 
-    UT_String parentPath;
-    UT_String childPath;
-
-    node->getFullPath(parentPath);
-    child->getFullPath(childPath);
-
-    const QString childPathString = QString::fromUtf8(childPath.c_str());
-    const QString childName = childPathString.section('/', -1);
-
+QJsonObject
+EventManager::baseObservation(const ObservationContext &context)
+{
     return {
-        {"event", "child_created"},
-        {"parent_path", QString::fromUtf8(parentPath.c_str())},
-        {"child_name", childName},
+        {"trace_version", TRACE_VERSION},
+        {"adapter", context.adapter},
+        {"scenario", context.scenario},
+        {"houdini_version", SYS_VERSION_FULL},
+        {"houdini_build", SYS_VERSION_BUILD_INT},
+        {"platform", platformName()},
+        {"python_version", QJsonValue::Null},
+        {"qt_version", QT_VERSION_STR},
+        {"hdk_api_version", HDK_API_VERSION},
+        {"scene_generation", static_cast<qint64>(context.sceneGeneration)},
+        {"observation", static_cast<qint64>(context.observation)},
+        {"timestamp_ns", static_cast<qint64>(
+            QDateTime::currentMSecsSinceEpoch() * static_cast<qint64>(1000000))},
+        {"event", "UNKNOWN_EVENT"},
+        {"event_reason", QJsonValue::Null},
+        {"node_path", QJsonValue::Null},
+        {"parent_path", QJsonValue::Null},
+        {"entity_id", QJsonValue::Null},
+        {"payload", QJsonObject{}},
+        {"undo_state", undoState()},
+        {"callback_depth", context.callbackDepth},
+        {"transaction_hint", context.transactionHint.isEmpty()
+            ? QJsonValue(QJsonValue::Null)
+            : QJsonValue(context.transactionHint)},
+        {"suppression", QJsonObject{{"depth", 0}, {"label", QJsonValue::Null}}},
     };
 }
 
-QJsonObject EventManager::onNodeDeleted(OP_Node *node, void *data)
+QJsonObject
+EventManager::createObservation(
+    OP_Node *node,
+    OP_EventType reason,
+    void *data,
+    const ObservationContext &context) const
 {
-    return {};
+    QJsonObject result = baseObservation(context);
+    const bool knownReason = static_cast<int>(reason) >= 0 && reason < OP_EVENT_TYPE_COUNT;
+    const char *eventName = knownReason ? OPeventToString(reason) : nullptr;
+    result["event"] = eventName ? QString::fromUtf8(eventName) : QString("UNKNOWN_EVENT");
+    result["event_reason"] = static_cast<int>(reason);
+
+    if (node)
+    {
+        const QString path = nodePath(node);
+        result["node_path"] = path.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(path);
+        OP_Network *parent = node->getParent();
+        const QString parentPath = nodePath(parent);
+        result["parent_path"] = parentPath.isEmpty()
+            ? QJsonValue(QJsonValue::Null)
+            : QJsonValue(parentPath);
+        const QString id = entityId(node);
+        result["entity_id"] = id.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(id);
+    }
+
+    // The callback payload is deliberately not dereferenced.  Its event-specific
+    // meaning remains unverified for this Houdini build until paired traces prove
+    // a safe interpretation.  Pointer addresses are neither stable nor useful.
+    result["payload"] = QJsonObject{
+        {"data_present", data != nullptr},
+        {"data_semantics", data ? "unverified" : "none"},
+    };
+    return result;
 }
 
-QJsonObject EventManager::onNameChanged(OP_Node *node, void *data)
+QJsonObject
+EventManager::createLifecycleObservation(
+    const QString &event,
+    int eventReason,
+    const ObservationContext &context) const
 {
-    return {};
+    QJsonObject result = baseObservation(context);
+    result["event"] = event;
+    result["event_reason"] = eventReason;
+    result["payload"] = QJsonObject{{"lifecycle", true}};
+    return result;
 }
 
-QJsonObject EventManager::onInputRewired(OP_Node *node, void *data)
+QJsonObject
+EventManager::createPayload(OP_Node *node, OP_EventType reason, void *data) const
 {
-    return {};
-}
-
-QJsonObject EventManager::onFlagChanged(OP_Node *node, void *data)
-{
-    return {};
-}
-
-QJsonObject EventManager::onParmChanged(OP_Node *node, void *data)
-{
-    return {};
-}
-QJsonObject EventManager::onParmAnimated(OP_Node *node, void *data)
-{
-    return {};
-}
-
-QJsonObject EventManager::onChPlaybackChanged(OP_Node *node, void *data)
-{
-    return {};
-}
-QJsonObject EventManager::onSpareParmModified(OP_Node *node, void *data)
-{
-    return {};
-}
-
-QJsonObject EventManager::onMultiParmModified(OP_Node *node, void *data)
-{
-    return {};
+    ObservationContext context;
+    QJsonObject result = createObservation(node, reason, data, context);
+    if (reason == OP_CHILD_CREATED)
+    {
+        result["event"] = "child_created";
+        result["parent_path"] = nodePath(node);
+    }
+    return result;
 }

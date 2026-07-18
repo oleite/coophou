@@ -21,6 +21,31 @@ Store sanitized fixtures containing:
 
 An API symbol existing is not proof that a gesture can be normalized safely.
 
+Current Phase-1 fixtures use:
+
+```text
+tests/fixtures/events/
+  schema-v1.json
+  houdini-21.0.729/hdk-api-21000693/windows/
+    hom/<scenario>.jsonl
+    hdk/<scenario>.jsonl
+```
+
+Run one fixture in a fresh Houdini process with:
+
+```powershell
+& "$env:HFS/bin/hython.exe" scripts/run_event_probe.py --adapter hom --scenario create_node
+& "$env:HFS/bin/hython.exe" scripts/run_event_probe.py --adapter hdk --scenario create_node
+```
+
+Generate the side-by-side report with:
+
+```powershell
+python scripts/compare_event_traces.py <hom-fixture-dir> <hdk-fixture-dir> --output docs/event-probe-comparison.md
+```
+
+The pure fixture test validates required fields, adapter/scenario consistency, and strictly increasing local observation numbers.
+
 ### 1. Pure unit tests
 
 Run without Houdini.

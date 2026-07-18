@@ -1,7 +1,7 @@
 #include "houdini_fixture.h"
 
 #include "event_manager.h"
-#include "watcher.cpp"
+#include "watcher.h"
 
 #include <OP/OP_Network.h>
 #include <OP/OP_Node.h>
@@ -58,10 +58,10 @@ TEST_F(HoudiniFixture, ChildCreatedPayloadUsesRealHoudiniNodes)
 
     EXPECT_EQ(jsonString(json, "event"), "child_created");
     EXPECT_EQ(jsonString(json, "parent_path"), "/obj");
-    EXPECT_EQ(jsonString(json, "child_name"), "geo_child");
+    EXPECT_TRUE(json.value("payload").isObject());
 }
 
-TEST_F(HoudiniFixture, UnknownEventReturnsEmptyPayload)
+TEST_F(HoudiniFixture, UnknownEventIsRecordedSafely)
 {
     OP_Network *obj = objectNetwork();
 
@@ -74,21 +74,46 @@ TEST_F(HoudiniFixture, UnknownEventReturnsEmptyPayload)
         static_cast<OP_EventType>(999999),
         nullptr);
 
-    EXPECT_TRUE(json.isEmpty());
+    EXPECT_EQ(jsonString(json, "event"), "UNKNOWN_EVENT");
+    EXPECT_EQ(json.value("event_reason").toInt(), 999999);
+    EXPECT_TRUE(json.value("payload").toObject().contains("data_semantics"));
 }
 
-TEST_F(HoudiniFixture, SanityCheck)
+TEST_F(HoudiniFixture, WatcherStartStopRestartIsIdempotent)
 {
+    ASSERT_TRUE(Watcher::start());
+    ASSERT_TRUE(Watcher::start());
+    EXPECT_TRUE(Watcher::isStarted());
+    ASSERT_TRUE(Watcher::stop());
+    ASSERT_TRUE(Watcher::stop());
+    EXPECT_FALSE(Watcher::isStarted());
+    ASSERT_TRUE(Watcher::start());
+    ASSERT_TRUE(Watcher::stop());
+}
 
-    OP_Network *obj = objectNetwork();
+namespace
+{
+int foreignCallbackCount = 0;
 
-    ASSERT_NE(obj, nullptr);
+void foreignCallback(OP_Node *, OP_EventType, void *, void *)
+{
+    ++foreignCallbackCount;
+}
+}
+
+TEST_F(HoudiniFixture, WatcherStopDoesNotRemoveForeignGlobalCallback)
+{
+    OP_Director *opDirector = OPgetDirector();
+    ASSERT_NE(opDirector, nullptr);
+    foreignCallbackCount = 0;
+    opDirector->addGlobalOpChangedCallback(foreignCallback, nullptr);
 
     ASSERT_TRUE(Watcher::start());
+    ASSERT_TRUE(Watcher::stop());
+    OP_Node *node = createObjectNode("geo", "foreign_callback_probe");
+    ASSERT_NE(node, nullptr);
+    opDirector->globalOpChanged(node, OP_NAME_CHANGED, nullptr);
 
-
-    OP_Node *child = createObjectNode("geo", "geo_child");
-
-    ASSERT_NE(child, nullptr);
-
+    EXPECT_GT(foreignCallbackCount, 0);
+    opDirector->removeGlobalOpChangedCallback(foreignCallback, nullptr);
 }

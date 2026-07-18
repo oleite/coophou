@@ -2,6 +2,7 @@ import hou
 
 from . import eventTranslation
 from ..common import *
+from ..probe import remote_application_suppression
 
 from PySide6.QtCore import *
 
@@ -19,7 +20,7 @@ class ClientReceiver(QObject):
         eventType = payload.get("event_type")
 
         def apply():
-            with hou.undos.disabler():
+            with remote_application_suppression("legacy_receiver_probe"), hou.undos.disabler():
 
                 print("[APPLYING PAYLOAD] ", payload)
 

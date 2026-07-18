@@ -107,4 +107,22 @@ if(BUILD_TESTING)
     gtest_discover_tests(CoopHou_Tests
         DISCOVERY_MODE PRE_TEST
     )
+
+    find_program(COOPHOU_PYTHON_EXECUTABLE
+        NAMES hython python
+        HINTS "$ENV{HFS}/bin"
+    )
+    if(COOPHOU_PYTHON_EXECUTABLE)
+        add_test(
+            NAME CoopHou.PythonProbeTests
+            COMMAND ${COOPHOU_PYTHON_EXECUTABLE}
+                -m unittest discover
+                -s ${CMAKE_CURRENT_SOURCE_DIR}/tests
+                -p test_*.py
+                -v
+        )
+        set_tests_properties(CoopHou.PythonProbeTests PROPERTIES
+            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+    endif()
 endif()

@@ -10,6 +10,25 @@ This document defines the recommended release scope. “Possible in Houdini” d
 - **personal state**: presence-only or intentionally local; never durable scene synchronization.
 - **unsupported**: outside the product contract until a new ADR changes it.
 
+## Phase-1 evidence: Houdini 21.0.729 / Windows
+
+These results come from fresh headless `hython` processes and do not promote any candidate to production support. Interactive UI gestures and other builds remain unverified.
+
+| Candidate | Measured observation | Evidence boundary |
+|---|---|---|
+| Create one node | HOM: one `ChildCreated`; HDK: parent `OP_CHILD_CREATED` followed by 26 initialization/visibility/input events for the tested object node | Collect initialization through a bounded settle point; ignore HDK initialization noise rather than serializing it |
+| Create copied subtree | IDs in `coophou.entity_id` were duplicated; copy emitted create, temporary/final rename, appearance, flag, and wiring bursts | One transaction after new-ID repair and subtree/wire collection; clipboard UI timing is still unverified |
+| Delete node/subtree | HOM: `BeingDeleted` then parent `ChildDeleted`; HDK: `OP_NODE_PREDELETE`, `OP_NODE_DELETED`, then parent `OP_CHILD_DELETED` | Capture tombstone data at pre-delete; group descendant deletes under one root transaction |
+| Rename | HOM supplied final path and `old_name`; HDK emitted one `OP_NAME_CHANGED` in the simple case | One final rename keyed by stable ID; path remains diagnostic |
+| Move | One scripted `setPosition()` emitted two HOM/HDK move observations, including parent-network noise | Filter parent noise and coalesce to final position; actual drag cadence is unverified |
+| Connect/disconnect | HOM and HDK each emitted one rewire event per set/unset; HOM supplied destination `input_index`, and the probe captured the current source/output | One destination-input edit with cached before-source and callback-time after-source |
+| Simple parameter tuple | Raw integer/float/toggle/string/menu-token/tuple values were preserved. Tuple sets emitted per-component callbacks; menu raw token `mesh` evaluated to integer index `2` | Group component callbacks by tuple/gesture and use raw menu token, not evaluated index |
+| Selected flags | Flag noise appeared around ordinary creation/copy and was not isolated into a reliable allowlist | Remains optional/unproven; do not include in the initial operation contract |
+| Undo/redo | Candidate scripted edits replayed. HDK marked 45 observations `undo_or_redo`; HOM could not distinguish callback-time undo from redo | Treat one undo-stack action as one transaction only after a reliable boundary/correlation mechanism exists |
+| Scene lifecycle | Save/merge/clear/load lifecycle pairs were observed; load nested clear | Not ordinary operations. Clear/load invalidate one scene generation; merge requires bounded create-transaction normalization or reconciliation |
+| Locked HDA boundary | A locked custom HDA reported `inside_editable=false`; mutation raised `hou.PermissionError` | Reject edits across the permission boundary; do not claim locked-internal support |
+| Temporary suppression | Three tuple callbacks retained HOM suppression depth/label during the scoped change | HOM probe proves scoped labeling; native correlation remains unresolved |
+
 ## v1 candidate operations
 
 | Operation | Identity | Capture concerns | Apply concerns | Conflict rule |

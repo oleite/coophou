@@ -1,6 +1,6 @@
 # Attached sketch audit
 
-This audit maps the current code to the engineering roadmap. It is intentionally static: validate every claim through the target Houdini build.
+This audit maps the original sketch to the engineering roadmap. Phase 0/1 subsequently validated and corrected it against Houdini 21.0.729 on Windows. Items below marked complete describe the current probe; later architecture remains unimplemented.
 
 ## Preserve
 
@@ -23,7 +23,7 @@ Do not discard these merely to create a cleaner architecture diagram.
 
 Convert this file from a synchronization sender into a temporary HOM event-probe adapter.
 
-Required immediate changes:
+Phase-1 disposition — **complete**:
 
 - remove only coophou-owned event-loop and node callbacks;
 - make `start()`/`stop()` idempotent;
@@ -37,7 +37,7 @@ Required immediate changes:
 
 Convert `Watcher` into an idempotent native trace source.
 
-Required immediate changes:
+Phase-1 disposition — **complete**:
 
 - store registration state;
 - stop safely;
@@ -51,7 +51,7 @@ Required immediate changes:
 
 Do not fill every handler with guessed synchronization payloads.
 
-For Phase 1, replace or supplement `EventManager` with an observation serializer whose purpose is to reveal:
+Phase 1 now supplements `EventManager` with an observation serializer that reveals:
 
 - event reason;
 - safe node/parent path at callback time;
@@ -127,9 +127,19 @@ At minimum:
 - remote application under suppression;
 - repeated start/stop/reload.
 
+## Static conclusions corrected by runtime evidence
+
+- HOM `BeingDeleted` and `ChildDeleted` preserve the path at callback time, but persistent user data is already unavailable in the tested immediate deletion. The probe therefore needs its plain-data snapshot cache. HDK `OP_NODE_PREDELETE` still exposes the ID before `OP_NODE_DELETED` clears it.
+- `hou.copyNodesTo` duplicated `coophou.entity_id` for one node and a connected subtree. It also produced transient/final rename and wiring bursts, confirming collision repair must happen before a single paste transaction is submitted.
+- A tuple `set()` produced one callback per changed component in both HOM and HDK, not one tuple-level semantic edit.
+- `setPosition()` produced two HOM `PositionChanged` / HDK `OP_UI_MOVED` observations, including parent-network noise. Position must be coalesced and filtered.
+- HDK global capture is substantially noisier than HOM during creation and HDA locking. `OP_PARM_VISIBLE_CHANGED`, `OP_PARM_ENABLE_CHANGED`, UI, and channel events cannot be treated as operations.
+- A load nests a clear. Scene generation advances once for the replacement, not once for both lifecycle labels.
+- HDK can determine `undo_or_redo` during the callback through `UTperformingUndoRedo`; tested HOM exposes no equivalent callback-time state.
+
 ## Stop condition
 
-The first milestone is complete when it produces evidence and a recommendation.
+The first milestone is complete for Houdini 21.0.729/Windows and has produced evidence and a recommendation.
 
 It should **not** continue directly into a full protocol implementation. Human review should select:
 

@@ -2,13 +2,31 @@ import json
 import getpass
 from importlib import reload
 
-import hou
+try:
+    import hou
+except ImportError:
+    hou = None
 
-from PySide6.QtCore import *
-from PySide6.QtNetwork import QAbstractSocket, QTcpServer, QHostAddress, QTcpSocket
+try:
+    from PySide6.QtCore import QObject, Slot
+    from PySide6.QtNetwork import QAbstractSocket, QTcpSocket
+except ImportError:
+    QObject = object
+
+    def Slot(*args, **kwargs):
+        del args, kwargs
+        return lambda function: function
+
+    QAbstractSocket = None
+    QTcpSocket = None
 
 from ..common import *
-from . import sender, receiver
+from . import sender
+
+if hou is not None:
+    from . import receiver
+else:
+    receiver = None
 
 
 class CoopHouClient(QObject):
@@ -21,7 +39,6 @@ class CoopHouClient(QObject):
             reload(receiver)
 
         self.sender = sender.ClientSender()
-        self.sender.payloadReady.connect(self.sendPayload)
 
         self.receiver = receiver.ClientReceiver()
         self.receiver.nodeCreated.connect(self.sender.addCallbacks)
@@ -69,6 +86,7 @@ class CoopHouClient(QObject):
 
     def onDisconnected(self):
         print("DISCONNECTED FROM SERVER.")
+        self.sender.stopWatcher()
         if self.reconnect:
             self.start()
 
@@ -91,17 +109,10 @@ class CoopHouClient(QObject):
             self.uid = packet["uid"]
             self.afterHandshake()
             return
-        
 
-        path = packet.get("node")
-        if not path:
-            path = packet.get("parm_tuple")
-            if path:
-                path = path.rpartition("/")[0]
-
-        self.sender.temporarilyIgnoreNode(path)
-        
-        self.receiver.onDataReceived(packet)
+        # Phase 1 is observation-only.  Do not feed legacy relay payloads into
+        # eventTranslation or mutate the scene while gathering probe evidence.
+        print("Ignoring legacy relay payload while the event probe is active.")
 
     def sendPayload(self, payload):
         payload["uid"] = self.uid

@@ -1,8 +1,6 @@
 # Current project state
 
-This file records what is actually present in the attached coophou sketch. It is based on static inspection of the repository on 2026-07-17.
-
-The code has **not** been compiled or executed in this documentation pass because the active environment does not contain the target Houdini SDK/runtime. The first implementation milestone must verify every build and runtime statement inside the declared target Houdini installation.
+This file records what is actually present in coophou. Static facts were first inspected on 2026-07-17; the Phase 0/1 facts below were then compiled and executed against the declared target installation on the same date.
 
 ## Confidence labels
 
@@ -28,11 +26,22 @@ The code has **not** been compiled or executed in this documentation pass becaus
 | Server entry point | Verified in sketch | `python -m coophou.server` | `coophou/server/__main__.py` |
 | Multi-client launcher | Verified in sketch | launches Houdini sessions in a test desktop | `scripts/launchClients.py` |
 | HDK commands | Verified in sketch | `coop_start`, `coop_stop` | `src/main.cpp` |
-| Target Houdini version/build | Unknown | — | must be declared |
-| `HDK_API_VERSION` | Unknown | — | must be recorded |
-| Supported platforms/compiler | Unknown | — | must be declared |
-| Verified build command | Unknown | — | must be run |
-| Verified test command | Unknown | — | must be run |
+| Target Houdini version/build | Verified at runtime | Houdini `21.0.729` | `hou.applicationVersionString()` |
+| Platform | Verified at runtime | `Windows-10-10.0.26200-SP0`, x86-64 | Houdini Python `platform.platform()` |
+| Houdini Python | Verified at runtime | `3.11.7`, MSC v.1942, 64-bit | Houdini `hython` |
+| Qt / PySide | Verified at runtime | Qt `6.5.3`, PySide `6.5.3` | Houdini `hython` |
+| `HDK_API_VERSION` | Verified from installed SDK | `21000693` | `UT/UT_HDKVersion.h` |
+| Compiler / SDK | Verified by configure/build | MSVC `19.44.35228`, toolset `14.44.35207`, Windows SDK `10.0.26100.0` | CMake/MSBuild output and `cl /Bv` |
+| CMake | Verified at runtime | `4.3.4` | `cmake --version` |
+| Verified configure command | Passed | `cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DBUILD_TESTING=ON` | local run |
+| Verified build command | Passed | `cmake --build build --config RelWithDebInfo --parallel` | built `CoopHou.dll` and `CoopHou_Tests.exe` |
+| Verified test commands | Passed | `ctest --test-dir build -C RelWithDebInfo --output-on-failure`; `python -m unittest discover -s tests -p "test_*.py" -v` | local runs |
+
+## Phase 0 target declaration
+
+The verified target is Houdini 21.0.729 on Windows build 10.0.26200 with MSVC 19.44. The plugin is installed by `houdini_configure_target` at `C:/Users/Spiel/Documents/houdini21.0/dso/CoopHou.dll`. The package loads Python from `python3.11libs/`; `pythonrc.py` adds the repository package root and `uiready.py` starts the environment-selected test client. The legacy server entry point remains `python -m coophou.server`; it is not used by the event probes.
+
+The checked-in sample inputs are generated from isolated empty scenes in fresh `hython` processes. No artist working `.hip` was opened or overwritten. The lifecycle scenario uses only a temporary directory.
 
 ## Current architecture
 
@@ -42,11 +51,10 @@ The code has **not** been compiled or executed in this documentation pass becaus
 
 - `CoopHouClient` uses `QTcpSocket`.
 - A handshake assigns a server-local numeric UID.
-- `ClientSender` observes HOM node events and emits dictionaries.
-- `ClientReceiver` schedules remote application using `hou.ui.postEventCallback`.
-- Remote changes are applied inside `hou.undos.disabler()`.
-- Event extraction and application are coupled in `client/eventTranslation.py`.
-- Synchronization currently addresses Houdini objects by path.
+- `ClientSender` is now a Phase-1 HOM observation probe and emits no synchronization operations.
+- The legacy `ClientReceiver` can schedule application using `hou.ui.postEventCallback` and `hou.undos.disabler()`, but `CoopHouClient` ignores non-handshake relay payloads during Phase 1.
+- Legacy event extraction/application remains in `client/eventTranslation.py`, but the probe does not call it.
+- Frozen legacy synchronization code addresses Houdini objects by path; the probe treats paths as diagnostics only.
 
 ### Python server
 
@@ -61,10 +69,10 @@ The code has **not** been compiled or executed in this documentation pass becaus
 
 **Verified in sketch**
 
-- `Watcher` uses `OP_Director::addGlobalOpChangedCallback`.
-- `coop_start` and `coop_stop` register and remove the callback.
-- The callback logs the event and inspects selected payload forms.
-- `EventManager` currently implements only a child-created JSON payload; the other declared event handlers return empty objects.
+- `Watcher` uses `OP_Director::addGlobalOpChangedCallback` plus owned director lifecycle callbacks.
+- `coop_start` and `coop_stop` are idempotent and remove only the exact coophou registrations.
+- The callback serializes safe callback-time values to a bounded plain-data queue. It never dereferences an unverified `void *data` payload or retains native pointers.
+- `EventManager` emits the versioned common observation shape for known and unknown events.
 - An HDK/gtest fixture initializes a `MOT_Director` and creates real object nodes.
 
 ### UI sketch
@@ -79,7 +87,7 @@ The code has **not** been compiled or executed in this documentation pass becaus
 
 Nothing should yet be marked as a production-supported operation.
 
-The Python sketch attempts:
+The frozen legacy `eventTranslation.py` sketch attempts:
 
 | Edit | Capture/apply sketch | Trustworthy contract? |
 |---|---|---|
@@ -94,23 +102,15 @@ The Python sketch attempts:
 
 The desired v1 surface is defined in `docs/operation-support-matrix.md`.
 
-## Immediate safety and correctness findings
+## Baseline safety findings and Phase-1 disposition
 
-These findings should be addressed in the first milestone without turning it into a full architecture rewrite.
+### 1. Baseline callback ownership was unsafe
 
-### 1. Callback ownership is currently unsafe
+**Resolved for the probe.** `ClientSender` retains exact bound callbacks and removes only those registrations. A reload-stable coophou registry stops the previous probe before replacement. Pure tests prove unrelated event-loop and node callbacks survive stop/restart.
 
-`ClientSender.startWatcher()` removes every callback returned by `hou.ui.eventLoopCallbacks()`.
+### 2. Baseline native watcher registration was not idempotent
 
-`ClientSender.addCallbacks()` calls `removeAllEventCallbacks()` on every observed node.
-
-Both actions can remove callbacks owned by Houdini or unrelated tools. coophou must remove only registrations it owns.
-
-### 2. Native watcher registration is not idempotent
-
-Repeated `Watcher::start()` calls may register the same global hook more than once. The current sanity test starts the watcher without stopping it.
-
-The event probe needs explicit registration state and symmetric cleanup.
+**Resolved for the probe.** `Watcher` has explicit registration state, symmetric global/director cleanup, and start/start/stop/stop/restart tests. An HDK test registers a foreign global callback and proves `Watcher::stop()` leaves it active.
 
 ### 3. TCP framing is not defined
 
@@ -120,15 +120,11 @@ TCP may combine or split messages arbitrarily. Do not build further protocol beh
 
 ### 4. Echo suppression is path-based and lossy
 
-Remote receive adds one path to `ignoredNodes`. During capture, one matching event removes the path and returns from the whole batch.
-
-One remote operation may emit several callbacks, a path may change, and an unrelated local edit may share the path later. Replace this with a scoped remote-apply context after the event probe establishes callback traces.
+**Legacy path suppression is no longer used by capture.** The HOM probe includes a nesting- and exception-safe temporary suppression context only to label evidence. It is not the final remote-apply contract. HDK observations cannot yet see the Python suppression depth.
 
 ### 5. Deletion capture can be discarded
 
-`processEvents()` filters buffered events through `hou.node(event["node"])`. A deleted node may no longer resolve, so the information needed for a delete operation can be removed before normalization.
-
-Deletion data must be captured while still valid, without retaining stale native pointers.
+**Resolved for the probe.** HOM copies paths and other values in the callback and maintains a main-thread plain-data snapshot cache for entity IDs that HOM has already cleared by `BeingDeleted`. HDK captures the entity ID at `OP_NODE_PREDELETE`; no native pointer survives the callback.
 
 ### 6. Paths are currently authoritative
 
@@ -138,9 +134,7 @@ The v1 design requires persistent entity IDs and path-reuse tests before these b
 
 ### 7. Callback payload normalization is incomplete
 
-The Python callback converts event values to strings. A bulk `ParmTupleChanged` may not identify one tuple. The native watcher also assumes selected `void *data` meanings that need to be proven for the target HDK build.
-
-The first milestone must log raw event categories safely and create checked-in trace fixtures.
+**Resolved for the probe.** Primitive values retain their types; parameter records distinguish raw and evaluated values and label `parm_tuple=None` as `bulk_or_ambiguous`. The native probe records only payload presence and `unverified` semantics. Fixtures are checked in under `tests/fixtures/events/houdini-21.0.729/hdk-api-21000693/windows/`.
 
 ### 8. Reconnect can spin
 
@@ -160,16 +154,19 @@ Keep the relay only as a disposable demonstration while the event probe is built
 
 These are useful probes, but they should not become routine full-scene or opaque-node synchronization without an ADR, deterministic tests, and recovery semantics.
 
-## First milestone
+## Phase 1 result and boundary
 
-The next implementation milestone is **Phase 0 + Phase 1**, not a server rewrite:
+Phase 0 + Phase 1 are complete for the declared Windows target in headless/scripted Houdini. Fifteen scenarios were captured through both adapters. See `docs/event-probe-report.md` and `docs/event-probe-comparison.md`.
 
-1. make startup and teardown non-destructive and idempotent;
-2. verify the existing CMake/HDK test setup;
-3. convert the HOM and HDK watchers into structured event probes;
-4. add scripted scenarios for the v1 operation matrix;
-5. check in trace fixtures and a generated comparison report;
-6. update this file with verified Houdini/build/platform evidence;
-7. stop and report before designing durable operations from those traces.
+Not verified in this environment pass:
 
-See `docs/implementation-roadmap.md` and the initial agentic prompt supplied with this package.
+- interactive Network Editor dragging and clipboard paste timing;
+- a licensed full UI session's event-loop settle behavior;
+- Linux or macOS;
+- any Houdini build other than 21.0.729;
+- exact meanings of HDK callback `void *data`;
+- a native DSO unload/reload cycle;
+- a `parm_tuple=None` bulk callback generated by a real gesture;
+- final operation, server, recovery, or collaboration UI contracts.
+
+The next milestone is human review of these fixtures followed by Phase 2's portable deterministic core. Do not turn the observations directly into network messages.

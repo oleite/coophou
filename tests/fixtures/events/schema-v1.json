@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coophou.invalid/schemas/event-trace-v1.json",
+  "title": "coophou Houdini event trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "trace_version", "adapter", "scenario", "houdini_version",
+    "houdini_build", "platform", "python_version", "qt_version",
+    "hdk_api_version", "scene_generation", "observation", "timestamp_ns",
+    "event", "event_reason", "node_path", "parent_path", "entity_id",
+    "payload", "undo_state", "callback_depth", "transaction_hint",
+    "suppression"
+  ],
+  "properties": {
+    "trace_version": {"const": 1},
+    "adapter": {"enum": ["hom", "hdk"]},
+    "scenario": {"type": "string", "minLength": 1},
+    "houdini_version": {"type": ["string", "null"]},
+    "houdini_build": {"type": ["integer", "null"]},
+    "platform": {"type": ["string", "null"]},
+    "python_version": {"type": ["string", "null"]},
+    "qt_version": {"type": ["string", "null"]},
+    "hdk_api_version": {"type": ["integer", "null"]},
+    "scene_generation": {"type": "integer", "minimum": 1},
+    "observation": {"type": "integer", "minimum": 1},
+    "timestamp_ns": {"type": "integer", "minimum": 0},
+    "event": {"type": "string", "minLength": 1},
+    "event_reason": {"type": ["string", "integer", "null"]},
+    "node_path": {"type": ["string", "null"]},
+    "parent_path": {"type": ["string", "null"]},
+    "entity_id": {"type": ["string", "null"]},
+    "payload": {"type": "object"},
+    "undo_state": {"enum": ["undo", "redo", "undo_or_redo", "not_undo_redo", "unknown"]},
+    "callback_depth": {"type": "integer", "minimum": 1},
+    "transaction_hint": {"type": ["string", "null"]},
+    "suppression": {
+      "type": "object",
+      "required": ["depth", "label"],
+      "properties": {
+        "depth": {"type": "integer", "minimum": 0},
+        "label": {"type": ["string", "null"]}
+      }
+    }
+  }
+}
