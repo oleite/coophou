@@ -41,8 +41,13 @@ Important caveat: a parameter callback may receive `parm_tuple=None` when many p
 
 Recommended use:
 
-- HDK bridge: an `FS_EventGenerator` wakes the main thread when a native queue has work.
-- HOM prototype: a bounded queue drained by one event-loop callback or posted callback.
+- HDK/C++ production adapter: callbacks enqueue bounded evidence and one
+  main-thread gateway settles capture or applies queued requests.
+- Native wakeup: an `FS_EventGenerator` may wake the main thread when tests and
+  measurements justify it; deterministic explicit draining is sufficient for
+  the first Phase 3 slice.
+- HOM fallback: a separately capability-gated adapter may use one bounded
+  event-loop callback or posted callback, but it is not the production path.
 - Networking thread: receives, validates framing, and enqueues plain data only.
 
 ### Thread safety
@@ -88,31 +93,31 @@ Therefore:
 
 - ship one DSO per supported Houdini API/platform build;
 - check runtime API compatibility;
-- keep the DSO thin;
-- permit a HOM-only fallback where possible;
+- keep the DSO thin by responsibility, not by routing production work through
+  Python HOM;
+- permit a HOM-only fallback only where declared capabilities and conformance
+  evidence support it;
 - do not store canonical state inside the DSO.
 
 ## Recommended runtime architecture
 
 ```text
-PySide6 collaboration panel
-        │
-        ▼
 portable client/session core
   - protocol
   - ordering
   - operation model
   - recovery
-  - presence
         │ plain records
         ▼
-Houdini adapter interface
-   ├── HOM adapter
-   └── thin HDK bridge
-          - global OP change hook
-          - scene lifecycle hook
-          - native event generator
-          - thread-safe event queues
+versioned native Python bridge
+        │ bounded plain records
+        ▼
+thin HDK/C++ production adapter
+   - global OP and scene lifecycle hooks
+   - persistent identity and tombstones
+   - bounded aggregation and scoped extraction
+   - native apply context and verification
+   - bounded capture/application queues
         │
         ▼
 single ordered main-thread application gateway
@@ -121,7 +126,9 @@ single ordered main-thread application gateway
 Houdini scene
 ```
 
-The HOM and HDK adapters should emit the same normalized **observations**, not different operation contracts.
+HOM may drive fixtures or independently inspect results in tests. Any fallback
+adapter must conform to the same normalized operation contract, but production
+capture and application do not depend on HOM callbacks or HOM mutation.
 
 ## Thin HDK bridge contract
 
@@ -130,25 +137,27 @@ The bridge should expose a narrow interface conceptually equivalent to:
 ```text
 start_capture(config)
 stop_capture()
+capture_state()
 drain_observations(max_count)
-post_wakeup()
+flush_settle()
+extract_supported_snapshot()
+enqueue_apply(request)
+drain_apply(max_transactions, max_operations)
 runtime_capabilities()
-runtime_version()
 ```
 
 An observation contains only plain data:
 
 ```text
-event category
-node pointer token valid only during immediate capture
-resolved node path
-stable entity ID if present
-event-specific index
+bridge schema version
+record category and supported event context
+stable entity ID and diagnostic path
+transaction/operation/correlation IDs where applicable
 scene generation
 monotonic local observation number
 ```
 
-Resolve all data that cannot outlive the callback before enqueuing it. Never retain raw `OP_Node*` pointers in a queue after deletion or scene replacement.
+Resolve all data that cannot outlive the callback before enqueuing it. Never retain raw `OP_Node*` pointers in a queue after deletion or scene replacement. Unknown versions, operation families, stale generations, and queue overflow fail closed with structured errors.
 
 The portable layer decides whether observations form:
 
@@ -160,29 +169,47 @@ The portable layer decides whether observations form:
 
 ## Recommended staged use of HDK
 
-### Stage A — HOM prototype
+### Stage A — completed probes and portable contracts
 
-Use HOM callbacks and a Python panel to validate:
+Keep the Phase 1 HDK/HOM traces as evidence and the Phase 2 portable records as
+the semantic reference. Do not rewrite probe evidence to imply coverage that
+was not measured.
 
-- product experience;
-- protocol;
-- operation contracts;
-- identity policy;
-- failure behavior.
+### Stage B — native Phase 3 adapter (complete for 21.0.729 / Windows)
 
-### Stage B — HDK event probe
+The versioned bridge and HDK-first identity, capture, aggregation, supported
+application, suppression, and verification paths are implemented. Real
+Houdini contracts prove both semantic directions for the seven families on the
+exact target.
 
-Build a native probe using global operator callbacks and scene events. Log exact traces for the supported matrix on each target Houdini build.
+Measured native API findings include:
 
-### Stage C — thin native capture bridge
+- `OP_CHILD_CREATED`, `OP_NODE_PREDELETE`, `OP_NAME_CHANGED`, `OP_UI_MOVED`,
+  `OP_INPUT_CHANGED`, `OP_INPUT_REWIRED`, and `OP_PARM_CHANGED` are sufficient
+  primary signals for the scripted declared surface when followed by one
+  bounded settle extraction;
+- `OP_INPUT_REWIRED` was required in addition to the earlier probe allowlist;
+- `PRM_ChoiceList::tokenFromIndex` and a bounded token search preserve ordinal
+  menu tokens instead of evaluated indices;
+- `OP_Node::canAccess(PRM_WRITE_OK)` rejects identity and parameter mutation
+  inside a locked HDA on this build;
+- `OP_Network::createNodeOfExactType`, native rename/position/input/parameter
+  APIs, and `destroyNode` implement the declared application surface;
+- load's nested clear advances one coophou scene generation, save does not, and
+  merge is classified explicitly rather than normalized silently.
 
-Move only event observation and main-loop wakeup into HDK when the probe proves value.
+No meaning is assigned to unverified callback `void *data`, and no raw pointer
+is retained across a callback or bridge call.
 
-### Stage D — measured native hot paths
+### Stage C — measured wakeup and hot paths
 
-Move application or serialization into C++ only after profiling proves a bottleneck and equivalent tests exist.
+Add an `FS_EventGenerator` or further native optimization only when measurements
+show that deterministic bounded draining cannot meet the latency budget.
 
-This avoids converting product iteration into a cross-platform C++ build problem prematurely.
+### Stage D — capability-gated fallback and additional builds
+
+Add a fallback or another Houdini/platform build only with explicit capability
+negotiation and its own conformance evidence.
 
 ## Feasible v1 surface
 

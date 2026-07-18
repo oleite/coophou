@@ -149,6 +149,44 @@ Cover:
 
 Keep the number of Houdini-dependent tests focused because they are slower and harder to run.
 
+Phase 3 adds three concrete layers:
+
+- `tests/test_native_adapter.cpp`: DSO capabilities, strict bridge schema,
+  persistent identity, bounded queues, supported snapshot extraction, native
+  apply/replay/echo classification, stale generation, and partial-failure
+  evidence against real HDK nodes;
+- `tests/test_houdini_adapter.py`: ordinary-Python bridge and orchestrator
+  parsing, ID ownership, serialization, and native-snapshot normalization;
+- `tests/houdini_phase3_contract.py`: fresh-`hython` capture and application
+  contracts for every v1 family, with native snapshots compared against
+  `FakeScene` in both directions.
+
+Run the exact target suite with:
+
+```powershell
+$env:HFS = 'C:\Program Files\Side Effects Software\Houdini 21.0.729'
+cmake -S . -B build
+cmake --build build --config RelWithDebInfo
+ctest --test-dir build -C RelWithDebInfo --output-on-failure
+python -m unittest discover -s tests -p 'test_*.py' -v
+& "$env:HFS\bin\hython.exe" tests/houdini_phase3_contract.py
+```
+
+`tests/houdini_phase3_benchmark.py` is a reproducible benchmark-style Houdini
+integration test. It reports external JSON-bridge distributions plus native
+callback-handler and extractor counters for 10/100/1000-node scans, a
+1000-node callback burst, move/parameter coalescing, copy/delete, native
+subtree apply/post-verification, and bridge state calls:
+
+```powershell
+& "$env:HFS\bin\hython.exe" tests/houdini_phase3_benchmark.py
+```
+
+The benchmark is also registered in CTest with a 120-second timeout. It has no
+machine-specific latency pass threshold; regression review compares the JSON
+measurements and the bounded-work invariants instead of making a noisy CI host
+the product performance contract.
+
 ## Required scenario matrix
 
 Also run the matrix through:

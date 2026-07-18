@@ -1,6 +1,7 @@
 #include "watcher.h"
 
 #include "event_manager.h"
+#include "native_adapter.h"
 
 #include <array>
 #include <deque>
@@ -16,6 +17,7 @@ namespace
 {
 std::mutex stateMutex;
 bool registered = false;
+bool probeEnabled = false;
 std::int64_t localObservation = 0;
 std::int64_t currentSceneGeneration = 1;
 int callbackDepth = 0;
@@ -69,6 +71,8 @@ Watcher::start()
 
     scenario = qEnvironmentVariable("COOPHOU_PROBE_SCENARIO", "unspecified");
     tracePath = qEnvironmentVariable("COOPHOU_PROBE_TRACE");
+    probeEnabled = !tracePath.isEmpty()
+        || qEnvironmentVariableIntValue("COOPHOU_PROBE_STDOUT") == 1;
     if (!tracePath.isEmpty())
     {
         traceFile.setFileName(tracePath);
@@ -106,7 +110,11 @@ Watcher::stop()
     for (OP_Director::EventType type : directorEventTypes)
         director->removeEventCallback(type, Watcher::directorEventHook, nullptr);
     registered = false;
-    flushObservations();
+    if (probeEnabled)
+        flushObservations();
+    else
+        pendingLines.clear();
+    probeEnabled = false;
     if (traceFile.isOpen())
         traceFile.close();
     return true;
@@ -154,7 +162,7 @@ Watcher::flushObservations()
         pendingLines.pop_front();
         if (traceFile.isOpen())
             traceFile.write(line);
-        else
+        else if (qEnvironmentVariableIntValue("COOPHOU_PROBE_STDOUT") == 1)
             std::cout << line.constData();
     }
     if (traceFile.isOpen())
@@ -173,12 +181,16 @@ Watcher::globalOpChangedHook(
     void *cbdata)
 {
     (void)cbdata;
-    ++callbackDepth;
-    const ObservationContext context = nextContext();
-    // serializer resolves every Houdini value while the callback is active.
-    // No OP_Node* or data pointer is stored in the resulting JSON object.
-    writeObservation(serializer.createObservation(node, reason, data, context));
-    --callbackDepth;
+    if (probeEnabled)
+    {
+        ++callbackDepth;
+        const ObservationContext context = nextContext();
+        // serializer resolves every Houdini value while the callback is active.
+        // No OP_Node* or data pointer is stored in the resulting JSON object.
+        writeObservation(serializer.createObservation(node, reason, data, context));
+        --callbackDepth;
+    }
+    NativeAdapter::instance().recordEvent(node, reason);
 }
 
 QString
@@ -220,9 +232,14 @@ Watcher::directorEventHook(OP_Director::EventType type, void *cbdata)
         loadInProgress = false;
         loadGenerationAdvanced = false;
     }
-    ++callbackDepth;
-    const ObservationContext context = nextContext("scene_lifecycle");
-    writeObservation(serializer.createLifecycleObservation(
-        lifecycleEventName(type), static_cast<int>(type), context));
-    --callbackDepth;
+    if (probeEnabled)
+    {
+        ++callbackDepth;
+        const ObservationContext context = nextContext("scene_lifecycle");
+        writeObservation(serializer.createLifecycleObservation(
+            lifecycleEventName(type), static_cast<int>(type), context));
+        --callbackDepth;
+    }
+    NativeAdapter::instance().recordLifecycle(
+        lifecycleEventName(type), currentSceneGeneration);
 }

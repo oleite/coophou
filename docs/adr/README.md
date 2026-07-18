@@ -37,6 +37,7 @@ Never rewrite history to make an old decision look current. Add a new ADR that s
 - [0002: Use persistent node user data as the v1 identity carrier](0002-persistent-node-user-data-identity.md)
 - [0003: Represent local undo and redo as new collaborative transactions](0003-v1-undo-policy.md)
 - [0004: Limit v1 to ordinary node-graph authoring](0004-v1-supported-surface.md)
+- [0005: Use an HDK-first production adapter](0005-hdk-first-production-adapter.md)
 
 Use sequential names:
 

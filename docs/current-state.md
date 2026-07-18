@@ -6,6 +6,8 @@ This file records what is actually present in coophou. Static facts were first i
 
 - **Verified in sketch**: directly present in the current files.
 - **Verified in portable core**: executed by ordinary-Python deterministic tests without Houdini.
+- **Verified in target native adapter**: executed through the installed DSO
+  against real Houdini 21.0.729 state and compared with the portable core.
 - **Requires runtime verification**: code exists, but its behavior has not been proven in the target Houdini build.
 - **Proposed**: target architecture from the engineering guide.
 - **Unsupported**: not currently implemented as a trustworthy contract.
@@ -28,6 +30,7 @@ This file records what is actually present in coophou. Static facts were first i
 | Server entry point | Verified in sketch | `python -m coophou.server` | `coophou/server/__main__.py` |
 | Multi-client launcher | Verified in sketch | launches Houdini sessions in a test desktop | `scripts/launchClients.py` |
 | HDK commands | Verified in sketch | `coop_start`, `coop_stop` | `src/main.cpp` |
+| DSO runtime load | Verified at runtime | `CoopHou.dll` auto-loads in `hython`; both commands are registered | Houdini 21.0.729 `hython` baseline |
 | Target Houdini version/build | Verified at runtime | Houdini `21.0.729` | `hou.applicationVersionString()` |
 | Platform | Verified at runtime | `Windows-10-10.0.26200-SP0`, x86-64 | Houdini Python `platform.platform()` |
 | Houdini Python | Verified at runtime | `3.11.7`, MSC v.1942, 64-bit | Houdini `hython` |
@@ -39,6 +42,9 @@ This file records what is actually present in coophou. Static facts were first i
 | Verified build command | Passed | `cmake --build build --config RelWithDebInfo --parallel` | built `CoopHou.dll` and `CoopHou_Tests.exe` |
 | Verified test commands | Passed | `ctest --test-dir build -C RelWithDebInfo --output-on-failure`; `python -m unittest discover -s tests -p "test_*.py" -v` | local runs |
 | Phase 2 final counts | Passed | 88 ordinary-Python tests; 6/6 CTest tests | local run on 2026-07-17 |
+| Phase 3 native bridge | Verified in target native adapter | ten prefixed `hou.coophou_native_*` JSON functions from the installed DSO | fresh `hython` process |
+| Phase 3 real contracts | Passed | 34 real-Houdini contract scenarios; all seven families in both semantic directions | `tests/houdini_phase3_contract.py` |
+| Phase 3 performance evidence | Passed | 10/100/1000-node scans and bounded burst/apply/bridge measurements | `tests/houdini_phase3_benchmark.py` |
 
 ## Phase 0 target declaration
 
@@ -78,6 +84,23 @@ The checked-in sample inputs are generated from isolated empty scenes in fresh `
 - `EventManager` emits the versioned common observation shape for known and unknown events.
 - An HDK/gtest fixture initializes a `MOT_Director` and creates real object nodes.
 
+### Phase 3 architectural direction
+
+**Accepted and implemented for the declared Phase-3 capability set**
+
+ADR 0005 selects an HDK/C++-first production adapter. Native code owns the
+supported capture, persistent identity, bounded settle/extraction, ordered
+main-thread application, echo classification, and semantic verification paths.
+A narrow versioned plain-data bridge will connect those Houdini-specific paths
+to the existing portable Phase 2 records and orchestration. HOM remains valid
+for UI, fixtures, diagnostics, independent test oracles, and an explicitly
+capability-gated fallback; it is not the production capture/application path.
+
+This extends ADR 0001 without moving protocol, canonical order, client recovery,
+transport, presence, or UI models into the DSO. The Phase 1 trace path remains
+available, while `NativeAdapter` consumes the owned global/lifecycle
+registrations for bounded production capture.
+
 ### UI sketch
 
 **Verified in sketch**
@@ -88,7 +111,10 @@ The checked-in sample inputs are generated from isolated empty scenes in fresh `
 
 ## Current synchronization surface
 
-Nothing should yet be marked as a production-supported operation.
+The seven Phase 2 families are native v1 candidates on Houdini 21.0.729 for
+explicitly configured ordinary operator types and fixed raw parameter tuples.
+This is single-process adapter evidence, not a multi-user release claim. The
+legacy relay and `eventTranslation.py` remain disconnected and untrusted.
 
 The frozen legacy `eventTranslation.py` sketch attempts:
 
@@ -123,7 +149,7 @@ TCP may combine or split messages arbitrarily. Do not build further protocol beh
 
 ### 4. Echo suppression is path-based and lossy
 
-**Legacy path suppression is no longer used by capture.** The HOM probe includes a nesting- and exception-safe temporary suppression context only to label evidence. It is not the final remote-apply contract. HDK observations cannot yet see the Python suppression depth.
+**Legacy path suppression is no longer used by capture.** The HOM probe includes a nesting- and exception-safe temporary suppression context only to label evidence. The Phase 3 adapter now uses a native transaction/operation context and separate identity-write suppression counters.
 
 ### 5. Deletion capture can be discarded
 
@@ -189,3 +215,35 @@ retain their fixed tuple order inside that unit.
 Phase 2 does not change the legacy relay, probes, trace fixtures, or Houdini
 application code. It proves portable semantics only. See
 `docs/phase-2-report.md` for test results and the precise Phase 3 boundary.
+
+## Phase 3 result and boundary
+
+Phase 3 is complete for the declared single-process target. The installed DSO
+uses `HOMextendLibrary` only to register a ten-function JSON bridge on `hou`;
+scene observation, identity, extraction, mutation, suppression, and
+post-application verification are HDK/C++. The bridge reports Houdini
+21.0.729, `HDK_API_VERSION` 21000693, Windows, schema 1, and exactly seven
+operation types. Requests are exact-field/version checked and limited to 4
+MiB. No live Houdini object crosses the boundary.
+
+One configured native root maps explicitly to portable `root`. Persistent
+`coophou.entity_id` values survive save/load; copied collisions are repaired
+before one parent-first `CreateSubtree`; tombstones prevent path reuse from
+retargeting old IDs. Capture/apply queues are bounded. Clear/load advance one
+generation and invalidate queued state; merge emits an explicit lifecycle
+record. Unexpected mid-transaction failure or semantic mismatch stops normal
+advancement in reconciliation-required state.
+
+The real-Houdini suite proves local capture → Phase 2 transaction → `FakeScene`
+and Phase 2 transaction → native apply → native extraction → `FakeScene` for
+all seven families. It also covers raw integer/float/boolean/string/menu-token
+tuples, expression/keyframe rejection, copy, nested generation, pre-delete
+identity, replay, preconditions, locked HDAs, echo suppression, queue overflow,
+schema rejection, module reload, save/load, merge, and stale generation.
+
+Still unverified: physical Network Editor drag release, physical clipboard
+paste, undo/redo direction and grouping, unexpected third-party OnCreated side
+effects beyond the tested generic generated/copy scopes, licensed interactive
+UI responsiveness, DSO unload, other Houdini builds, and non-Windows targets.
+No networking, discovery, collaboration UI, presence, snapshot recovery, or
+collaborative undo was implemented.

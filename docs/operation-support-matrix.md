@@ -6,6 +6,10 @@ This document defines the recommended release scope. “Possible in Houdini” d
 
 - **v1 candidate**: implement after the event probe and contract tests pass.
 - **portable v1 contract**: strict Phase 2 domain/fake-scene behavior is implemented; real Houdini capture/application remains unverified until Phase 3.
+- **native v1 candidate**: Phase 2 semantics have real Houdini 21.0.729
+  capture, HDK application, native extraction, and `FakeScene` round-trip
+  evidence for the declared operator/parameter capability set. Interactive
+  gesture and undo evidence may still be outstanding.
 - **v1 optional**: useful, but may be cut without weakening the core experience.
 - **later**: requires a richer identity, transaction, or conflict model.
 - **personal state**: presence-only or intentionally local; never durable scene synchronization.
@@ -30,16 +34,38 @@ These results come from fresh headless `hython` processes and do not promote any
 | Locked HDA boundary | A locked custom HDA reported `inside_editable=false`; mutation raised `hou.PermissionError` | Reject edits across the permission boundary; do not claim locked-internal support |
 | Temporary suppression | Three tuple callbacks retained HOM suppression depth/label during the scoped change | HOM probe proves scoped labeling; native correlation remains unresolved |
 
+## Phase-3 native evidence: Houdini 21.0.729 / Windows
+
+All seven serialized Phase 2 families are now **native v1 candidates** within
+one explicitly configured root. HDK global/lifecycle callbacks drive capture;
+HDK reads and mutations drive settle, application, and verification. The real
+contract suite compares local candidates and remotely applied transactions to
+the unchanged `FakeScene` semantic projection.
+
+Verified boundaries include ordinary `null`, `subnet`, `merge`, and test-scope
+`geo` nodes; configured fixed parameters with integer, finite float, boolean,
+string, menu-token, and fixed-tuple raw kinds; persistent IDs; connected copy;
+nested generated scopes; pre-delete subtree IDs; path reuse; replay; expected
+value/source/name failures; echo suppression; save/load generation; merge
+classification; queue overflow; and locked-HDA rejection. Operator types and
+parameter names are allowlisted per capture configuration. Expressions,
+keyframes, locked internals, buttons, spare schemas, multiparms, HDA definition
+edits, flags, animation, and cooked state remain unsupported.
+
+Scripted creation, copy, move, parameter, wiring, save/load, and merge are
+automated evidence. Physical mouse drag, clipboard paste, undo/redo direction,
+and DSO unload are still unverified and are not implied by this status.
+
 ## v1 candidate operations
 
-Phase 2 promotes the seven rows below to **portable v1 contract** status only.
-That status does not claim a production Houdini adapter. Connect and disconnect
-share one explicit destination-input operation.
+Phase 3 promotes the seven serialized families below to **native v1 candidate**
+status on the exact target and narrow capability set above. Connect and
+disconnect share one explicit destination-input operation.
 
 | Operation | Identity | Capture concerns | Apply concerns | Conflict rule |
 |---|---|---|---|---|
-| Create one node | New node ID + parent ID | Parent `ChildCreated`; exact initialization may span callbacks | Exact type/name/position; operator availability | Canonical transaction; authority resolves final name |
-| Create copied subtree | New IDs for every copied node | Must wait one event-loop turn and collect complete subtree/internal wires | Parent-before-child topological apply | Canonical transaction; duplicate IDs repaired before submit |
+| Create one node | New node ID + parent ID | `OP_CHILD_CREATED` plus bounded settle; immediate supported parameters coalesce into the spec | Exact allowlisted type/name/position/parameters; collision prevalidated | Canonical transaction; authority resolves final name |
+| Create generic subtree | New IDs for every new node | One settle groups copied, scripted, or generated siblings/descendants and internal wires | Parent-before-child, then wires; exact final native verification | Canonical transaction; duplicate IDs repaired before submit |
 | Delete node/subtree | Existing root ID + descendant tombstones | Capture IDs before destruction; avoid dangling pointers | Delete only matching IDs | Canonical delete dominates later edits |
 | Rename node | Node ID | Callback occurs after rename | Exact final canonical name | Later canonical rename wins |
 | Move node | Node ID | High-frequency drag events | Layout-only mutation; coalesce | Latest accepted position wins |

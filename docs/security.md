@@ -39,6 +39,19 @@ Do not add “temporary debug” remote execution paths.
 
 ## Input validation
 
+### Phase-3 native bridge boundary
+
+The installed Houdini DSO accepts only JSON objects up to 4 MiB through ten
+prefixed `hou.coophou_native_*` functions. Every request validates bridge
+schema version and exact fields; apply validates the complete frozen
+transaction/operation shape, allowlisted operation type, configured operator
+and parameter capability, IDs, bounds, preconditions, and scene generation
+before mutation. Unknown fields, versions, operations, queue overflow, and
+stale work fail closed. No request can provide Python, imports, callbacks,
+expressions, arbitrary filesystem paths, or raw Houdini objects. Scene work is
+main-thread-only. The bridge is local process plumbing and is not a network
+protocol or trust grant.
+
 Validate before Houdini application:
 
 - protocol version;

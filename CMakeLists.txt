@@ -29,6 +29,7 @@ find_package(Houdini REQUIRED)
 
 add_library(CoopHouCore STATIC
     src/event_manager.cpp
+    src/native_adapter.cpp
     src/utils.cpp
     src/watcher.cpp
 
@@ -90,6 +91,7 @@ if(BUILD_TESTING)
         tests/test_main.cpp
         tests/houdini_fixture.cpp
         tests/test_event_manager.cpp
+        tests/test_native_adapter.cpp
     )
 
     target_include_directories(CoopHou_Tests
@@ -123,6 +125,24 @@ if(BUILD_TESTING)
         )
         set_tests_properties(CoopHou.PythonProbeTests PROPERTIES
             ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        add_test(
+            NAME CoopHou.HoudiniPhase3Contract
+            COMMAND ${COOPHOU_PYTHON_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/houdini_phase3_contract.py
+        )
+        set_tests_properties(CoopHou.HoudiniPhase3Contract PROPERTIES
+            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        add_test(
+            NAME CoopHou.HoudiniPhase3Benchmark
+            COMMAND ${COOPHOU_PYTHON_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/houdini_phase3_benchmark.py
+        )
+        set_tests_properties(CoopHou.HoudiniPhase3Benchmark PROPERTIES
+            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}"
+            LABELS "performance"
+            TIMEOUT 120
         )
     endif()
 endif()

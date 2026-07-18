@@ -60,27 +60,50 @@ relay module and creates no runtime singleton.
 
 The implemented authority owns an abstract supported-state projection per
 session and assigns one canonical sequence per atomic transaction. Each client
-owns separate confirmed and optimistic projections. These are portable
-reference semantics for later adapters, not evidence that a Houdini adapter or
-network authority exists.
+owns separate confirmed and optimistic projections. These remain the portable
+reference semantics. Phase 3 now supplies one real single-process Houdini
+adapter; no real network authority exists.
+
+### Phase 3 implemented boundary
+
+`src/native_adapter.*` and the existing owned `Watcher` implement HDK-first
+capture, persistent identity, configured-root extraction, bounded queues,
+main-thread application, echo classification, and post-apply verification for
+the seven Phase 2 families on Houdini 21.0.729 / Windows. `src/main.cpp`
+registers a narrow JSON bridge through Houdini's official HOM extension hook;
+`coophou/houdini_adapter/` converts only plain records and owns portable IDs
+and single-process orchestration. The native mirror retains plain supported
+state, never a Houdini pointer between calls.
+
+This is an adapter contract, not a session product. Transport, discovery,
+multi-process authority wiring, UI, presence, snapshot recovery, and supported
+undo remain absent.
 
 ## Feasibility position
 
 **Required:** coophou targets a supported node-authoring subset, not arbitrary Houdini state.
 
-**Proposed:** the implementation is hybrid:
+**Required by ADR 0005:** the production Houdini adapter is HDK/C++-first
+behind a narrow plain-data bridge:
 
 ```text
 portable collaboration core
         │
-Houdini adapter interface
-   ├── HOM adapter
-   └── thin HDK bridge
+versioned native Python bridge
         │
-single main-thread apply gateway
+thin HDK/C++ production adapter
+   ├── global/lifecycle capture and scoped extraction
+   └── ordered main-thread application gateway
+        │
+supported Houdini scene state
 ```
 
-The HDK bridge is ABI-sensitive and therefore must remain small. Protocol, ordering, recovery, conflict rules, presence, and user-facing models remain portable.
+The HDK bridge is ABI-sensitive and therefore remains small by responsibility.
+It owns Houdini-specific capture, identity, extraction, supported mutation, and
+verification, but not protocol, canonical ordering, recovery policy, conflict
+rules, transport, presence, or user-facing models. HOM is reserved for UI,
+fixtures, diagnostics, independent test oracles, and explicitly negotiated
+fallbacks with separate conformance evidence.
 
 See [docs/hdk-hom-feasibility.md](docs/hdk-hom-feasibility.md), ADR 0001, and the [operation support matrix](docs/operation-support-matrix.md).
 
@@ -123,12 +146,14 @@ Do not let separate features call `setOverlayShapes` independently and overwrite
 
 ### Houdini adapter
 
-Owns all direct interaction with `hou` and Houdini-specific lifecycle hooks.
+Owns all direct interaction with Houdini scene APIs and Houdini-specific
+lifecycle hooks. The production implementation uses HDK/C++; HOM use is
+limited to the roles declared by ADR 0005.
 
 Responsibilities:
 
 - register and unregister callbacks;
-- translate `hou` objects to stable references and plain data;
+- translate native Houdini objects to stable references and plain data;
 - schedule remote mutation on Houdini's main thread;
 - group or suppress callback echo;
 - expose scene lifecycle events;

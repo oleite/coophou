@@ -8,14 +8,42 @@ This document covers requirements at the boundary between coophou and SideFX Hou
 
 The default architectural direction is:
 
-- HOM for early product iteration and PySide6 UI;
-- a thin HDK bridge for global operator observation and native event-loop wakeup;
-- one shared plain-data observation contract;
-- one shared main-thread application gateway.
+- an HDK/C++-first production adapter for supported observation, identity,
+  scoped extraction, application, and verification;
+- a narrow, versioned, bounded plain-data bridge to the portable core;
+- HOM for PySide6 UI, fixtures, diagnostics, independent test oracles, and
+  explicitly capability-gated fallback behavior;
+- one native ordered main-thread application gateway.
 
-The HDK bridge must not own protocol, canonical ordering, conflict rules, or recovery.
+The HDK bridge must not own protocol, canonical ordering, conflict rules,
+recovery policy, transport, presence, or UI models.
 
-See [hdk-hom-feasibility.md](hdk-hom-feasibility.md) and ADR 0001.
+See [hdk-hom-feasibility.md](hdk-hom-feasibility.md), ADR 0001, and ADR 0005.
+
+## Implemented Phase-3 adapter
+
+`src/native_adapter.cpp` is the Houdini-specific implementation for the exact
+21.0.729 Windows target. The installed `CoopHou.dll` registers ten prefixed
+JSON functions on `hou` through `HOMextendLibrary`; this is a language bridge,
+not HOM scene application. `coophou/houdini_adapter/bridge.py` performs lazy
+plain-data calls, `projection.py` normalizes the configured native root to the
+synthetic Phase-2 root, and `orchestrator.py` owns operation/transaction IDs and
+single-process portable confirmation.
+
+The native adapter holds a bounded supported-state mirror, ID lookup data,
+tombstones, affected scopes, expected-echo/internal-identity classification,
+capture/apply queues, and scene generation. Callbacks mark evidence and copy
+pre-delete IDs; an explicit settle reads the configured supported scope once,
+repairs new collisions, coalesces final values, diffs against the mirror, and
+emits plain operation candidates without operation IDs. Native application
+prevalidates the whole transaction against a staged abstract snapshot, applies
+in order on the main thread, extracts again, and returns success only after a
+semantic comparison.
+
+This implementation deliberately has no automatic event-loop drain yet. Phase
+3 tests call settle/apply drains explicitly; Phase 4 may add one bounded native
+wakeup owner when real session transport exists. No networking wait or Python
+callback occurs per raw HDK event.
 
 Houdini is an interactive application with thread-affine APIs and complex event behavior. Treat integration code as an adapter around the collaboration core, not as the place where protocol and recovery policy accumulate.
 
@@ -97,15 +125,19 @@ Do not assume process exit is the only cleanup path.
 
 ### Global HDK capture
 
-`OP_Director::addGlobalOpChangedCallback` is the preferred native experiment for broad operator changes. `OP_Node::addOpInterest` is available for targeted observations.
+`OP_Director::addGlobalOpChangedCallback` is the primary production evidence
+source for broad supported operator changes. `OP_Node::addOpInterest` is
+available for targeted observations.
 
 Do not assume the callback reason maps one-to-one to the desired operation. Feed it through the event probe and normalization layer.
 
 Do not enqueue raw `OP_Node*` values. During the callback, resolve all information needed after return. Deletion and scene replacement invalidate pointers.
 
-### HOM capture
+### HOM diagnostics and fallback
 
-`hou.OpNode.addEventCallback` is session-local and usually registered per relevant node or parent network.
+`hou.OpNode.addEventCallback` is session-local and may be used by probes,
+fixtures, independent test oracles, or an explicitly capability-gated fallback.
+Production capture must not depend on it.
 
 HOM callbacks can report:
 
@@ -118,15 +150,16 @@ HOM callbacks can report:
 
 A bulk parameter event may provide `parm_tuple=None`; request a bounded node diff instead of guessing.
 
-Houdini callbacks are implementation signals, not semantic operations.
+Both HDK and HOM callbacks are implementation signals, not semantic operations.
 
 Capture code should:
 
 1. receive the callback;
 2. exit quickly if collaboration is inactive or the event is a known remote echo;
-3. copy only the Houdini data needed to normalize the event;
-4. attach scene/session generation;
-5. enqueue normalization or create a small operation;
+3. copy safe immediate identity and event context, including pre-delete data;
+4. attach scene/session generation and mark a bounded affected scope when a
+   settle read is required;
+5. enqueue evidence for native aggregation and supported-state extraction;
 6. return control to Houdini.
 
 Avoid:

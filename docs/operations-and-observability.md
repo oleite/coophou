@@ -131,6 +131,28 @@ Use message ID for each transport envelope and canonical sequence after acceptan
 
 ## Metrics
 
+### Phase-3 native adapter diagnostics
+
+`hou.coophou_native_capture_state()` now exposes bounded, content-free native
+diagnostics: capture/apply queue sizes and overflow flags, reconciliation
+state, scene generation, events seen/ignored, expected remote echoes and
+internal identity events suppressed, settle count, mirrored-node/tombstone
+counts, callback-handler nanosecond total/max, and supported-snapshot
+extraction count/total/max. These counters contain no parameter values or node
+names.
+
+Capture records carry capture sequence, scene generation, affected scopes,
+and cumulative event/settle counts. Apply results preserve correlation,
+transaction, operation, operation-index, and scene-generation context. Queue
+overflow, stale generation, schema failure, prevalidation failure, semantic
+mismatch, and unexpected partial application have stable structured error
+codes. Normal production operation no longer prints an unbounded HDK trace;
+probe stdout is explicit opt-in.
+
+The Phase-3 benchmark consumes these counters. They are local diagnostics, not
+proof of transport or synchronization health, and no UI status is implemented
+in this phase.
+
 Additional Houdini and UX metrics:
 
 - callback duration by event type and adapter;

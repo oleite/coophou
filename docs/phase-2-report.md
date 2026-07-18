@@ -118,7 +118,12 @@ before loser-rejection case intentionally stops the loser in
 
 ## Recommended Phase 3 milestone
 
-Build one single-process HOM adapter against these unchanged contracts: assign
+> **Phase 3 direction update (ADR 0005):** this historical handoff selected a
+> HOM adapter before the native Phase 3 decision was accepted. The production
+> adapter is now HDK/C++-first behind a narrow plain-data bridge; the unchanged
+> Phase 2 contracts remain the semantic reference.
+
+Build one single-process Houdini adapter against these unchanged contracts: assign
 and repair persistent node IDs; normalize only the seven proven Phase 1 event
 families; route all fake-core-to-Houdini mutation through one bounded ordered
 main-thread gateway with scoped echo suppression and scene-generation checks;

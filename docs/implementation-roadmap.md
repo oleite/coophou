@@ -87,23 +87,32 @@ Transient presence remains deferred because it is explicitly outside the Phase
 Deterministic unit, multi-client, and seeded randomized tests pass under
 duplicate, dropped, delayed, reordered, rejected, gap, reconnect,
 history-unavailable, queue-overflow, and atomic mid-transaction failure
-scenarios. The core imports without Houdini. Phase 3 is not started.
+scenarios. The core imports without Houdini. This was the Phase 2 exit state;
+Phase 3 is now complete below.
 
 ## Phase 3 — single-process Houdini adapter
 
-Implement the HOM adapter first unless probe results justify immediate native capture.
+**Status: complete for Houdini 21.0.729 / Windows (2026-07-17).** See
+`docs/phase-3-report.md`.
+
+**Architectural direction accepted by ADR 0005 (2026-07-17):** implement the
+production adapter HDK/C++-first behind a narrow, versioned plain-data bridge.
 
 Features:
 
 - identity assignment and collision repair;
-- capture and normalization;
-- ordered main-thread application gateway;
-- remote echo suppression;
-- scene generation;
-- local undo/redo policy;
-- collaboration panel;
-- overlay composition service;
-- event-loop queue draining.
+- HDK global/lifecycle capture as primary evidence;
+- bounded event aggregation and targeted supported-state extraction;
+- native normalization input for the frozen Phase 2 operation families;
+- ordered, bounded, main-thread native application gateway;
+- native remote-apply and internal-identity echo classification;
+- semantic post-apply verification and truthful partial-failure reporting;
+- scene generation and stale-work rejection;
+- thin Python orchestration against a single-process portable authority;
+- reproducible native/bridge performance measurements.
+
+Collaboration UI, presence, physical gesture claims, snapshot recovery, and
+supported undo/redo behavior are outside this phase.
 
 Use two logical clients against one process only in tests; do not claim multi-user alpha yet.
 
@@ -111,15 +120,15 @@ Use two logical clients against one process only in tests; do not claim multi-us
 
 Every v1 operation passes:
 
-- fresh apply;
+- local capture and accepted native apply;
 - replay;
-- undo/redo;
-- copy/paste;
+- scripted copy/generated-subtree identity collision repair;
 - scene save/load;
 - cleanup/reload;
 - permission failure;
 - path reuse;
-- UI latency budgets.
+- echo suppression and semantic verification;
+- bounded queue and main-thread latency budgets.
 
 ## Phase 4 — session authority and two-client alpha
 
@@ -131,8 +140,10 @@ Implement:
 - history and resume;
 - acknowledgement;
 - bounded queues;
-- lossy presence;
-- two real Houdini clients.
+- real LAN/VPN framing and capability negotiation;
+- two real Houdini clients;
+- passwordless LAN discovery only after direct-address session behavior is
+  trustworthy.
 
 ### Exit gate
 
@@ -149,15 +160,14 @@ A scripted two-client test repeatedly:
 
 A 30-minute artist test completes without false synchronized status or lost local work.
 
-## Phase 5 — thin HDK bridge
+## Phase 5 — native packaging and measured expansion
 
-Move only proven needs into a versioned DSO:
+The thin HDK bridge begins in Phase 3. Phase 5 broadens only proven needs:
 
-- global OP capture if it materially improves coverage;
-- scene lifecycle capture;
-- efficient native wakeup/event generator;
-- bounded native queues;
-- narrow HOM extension or equivalent bridge API.
+- efficient native wakeup/event generation when measurements justify it;
+- additional supported Houdini/platform builds;
+- measured native hot-path optimization;
+- capability-gated fallback conformance where useful.
 
 ### Packaging
 
@@ -165,11 +175,13 @@ Move only proven needs into a versioned DSO:
 - one binary per supported API/platform/compiler combination;
 - runtime `HDK_API_VERSION` check;
 - package manifest chooses compatible DSO;
-- HOM-only fallback when capability allows.
+- fallback only when declared capabilities and conformance tests allow it.
 
 ### Exit gate
 
-The native bridge produces the same observation contracts as HOM, passes the same trace tests, unloads/cleans up safely where supported, and does not own canonical state.
+Every added build or fallback passes the same operation conformance and cleanup
+contracts, reports exact capabilities, and does not move canonical state into
+the DSO. DSO unload remains unclaimed unless safely testable.
 
 ## Phase 6 — recovery hardening
 

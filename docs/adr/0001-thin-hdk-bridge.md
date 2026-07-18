@@ -42,12 +42,15 @@ Phase 2 implements the operation, transaction, authority, client recovery, and
 fault-simulation logic in `coophou/core/`. Importing that package in ordinary
 Python loads no `hou`, Qt, socket, or native-binding dependency. This is direct
 evidence that the portable/native boundary in this decision is workable; the
-Phase 1 DSO remains an observation probe and owns no canonical state.
+Phase 1 DSO remains an observation probe and owns no canonical state. ADR 0005
+extends this decision by making the thin native bridge the production Houdini
+adapter for supported capture and application while preserving this ownership
+boundary.
 
 ### Positive
 
 - product logic remains testable without Houdini;
-- HOM prototype and HDK bridge can share contracts;
+- native and any capability-gated fallback adapters can share contracts;
 - ABI rebuilds affect a small component;
 - native crashes have a smaller blast radius;
 - platform packaging is manageable.
@@ -56,17 +59,21 @@ Phase 1 DSO remains an observation probe and owns no canonical state.
 
 - language-boundary queue and binding code is required;
 - some event normalization may need a round trip into portable code;
-- both HOM and HDK adapters require conformance tests.
+- every native build or fallback adapter requires conformance tests.
 
 ## Compatibility
 
-Package one DSO per supported `HDK_API_VERSION`, platform, and compatible compiler family. Refuse unsupported native loading and use a capability-declared HOM fallback where possible.
+Package one DSO per supported `HDK_API_VERSION`, platform, and compatible
+compiler family. Refuse unsupported native loading. Use a HOM fallback only
+where explicit capabilities and independent conformance evidence prove the
+requested operation surface.
 
 ## Testing
 
-- same event trace fixtures for HOM and HDK;
+- native operation conformance against the portable contract and preserved
+  event-probe evidence;
 - runtime API-version rejection;
 - queue overflow;
 - scene replacement with queued observations;
 - start/stop/reload cleanup;
-- native bridge absence fallback.
+- native bridge absence and capability-gated fallback behavior.

@@ -44,12 +44,19 @@ Choose the documents relevant to the work:
 
 ## Architectural position
 
-### Houdini integration is hybrid
+### Houdini integration is HDK-first behind a narrow bridge
 
 - Keep protocol, operation, ordering, recovery, and most tests in portable code.
-- Treat **HOM** as the fastest prototyping and UI layer.
-- Treat the **HDK** as a thin, version-specific native bridge for global event observation, efficient main-loop wakeups, and only measured native hot paths.
-- Never put business rules or canonical-session logic inside an ABI-sensitive HDK DSO.
+- Treat the **HDK/C++ adapter** as the production path for supported capture,
+  identity, scoped extraction, application, and post-apply verification.
+- Treat **HOM** as a UI, fixture, diagnostic, independent-test-oracle, or
+  explicitly capability-gated fallback layer—not the production capture or
+  application foundation.
+- Keep the native adapter thin by responsibility: never put protocol rules,
+  canonical-session logic, recovery policy, presence, or UI models inside the
+  ABI-sensitive DSO.
+- Connect native Houdini work to the portable core through a bounded,
+  versioned, plain-data bridge.
 - Build and package the HDK bridge per supported Houdini/platform/compiler combination.
 
 ### Do not claim API coverage without a probe
