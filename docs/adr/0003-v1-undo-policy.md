@@ -8,6 +8,11 @@
 
 ## Context
 
+This ADR intentionally remains **Proposed** after Phase 2. The portable core
+does not interpret undo/redo, and Phase 1 did not prove reliable gesture
+boundaries across the supported operation surface. Phase 3 must not treat this
+policy as accepted without the required Houdini probes and contract tests.
+
 Putting remote edits on a user's local undo stack allows Ctrl+Z to undo another collaborator's work. A true server-side semantic undo is substantially more complex.
 
 Houdini already performs local undo/redo correctly for the local scene and emits change notifications for many affected properties.

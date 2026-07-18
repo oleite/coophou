@@ -1,6 +1,6 @@
 # ADR 0004: Limit v1 to ordinary node-graph authoring
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-17
 - **Owners:** coophou maintainers
 - **Supersedes:** None
@@ -19,8 +19,10 @@ v1 supports only the operations marked **v1 candidate** in `docs/operation-suppo
 - rename;
 - network position;
 - input connect/disconnect;
-- simple unanimated, unexpressed parameter tuples;
-- selected allowlisted node flags after probe validation.
+- simple unanimated, unexpressed parameter tuples.
+
+Node flags are not part of the accepted v1 durable surface. Adding any flag is
+an expansion requiring its own probe evidence and capability update.
 
 Transient presence is separate.
 
@@ -35,6 +37,13 @@ Transient presence is separate.
 - personal workspace state.
 
 ## Consequences
+
+Phase 2 provides strict portable contracts for exactly these seven families:
+ordinary-node create, copied-subtree create, subtree delete, rename, final
+position, destination-input connect/disconnect, and complete simple raw
+parameter tuple. No generic mutation payload is available. Houdini adapter
+support still depends on Phase 3 capture/application probes; accepting this ADR
+does not claim those integrations are complete.
 
 The first release can be genuinely reliable and enjoyable for procedural node-network collaboration, but it must label unsupported edits honestly.
 

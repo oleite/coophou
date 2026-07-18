@@ -118,6 +118,12 @@ Do not reset sequence counters or operation IDs during reconnect.
 
 The product must choose one policy.
 
+**Phase 2 choice:** disallow new portable local submissions while disconnected,
+joining, catching up, incompatible, fatal, or reconciliation-required. Local
+submissions may continue while `DEGRADED` only when that state means bounded
+unconfirmed local work and no known sequence gap. Existing pending transactions
+survive reconnect and retry with their original immutable IDs.
+
 ### Disallow edits while disconnected
 
 Simplest correctness model. UI should clearly lock or pause collaboration capture.
@@ -270,6 +276,14 @@ Possible outcomes:
 - full reconciliation is required.
 
 Transform logic must be operation-specific and tested. Do not build a generic “fix paths and retry” rebase.
+
+Phase 2 uses checkpoint plus replay in memory: apply a contiguous canonical
+transaction to `confirmed_scene`, remove an identically matched local pending
+record when applicable, then reconstruct `working_scene` by applying all
+surviving pending transactions in local submission order. No payload transform
+is attempted. A failed replay preserves the pending record and enters
+`RECONCILIATION_REQUIRED`. `HISTORY_UNAVAILABLE` has the same explicit outcome
+because Phase 2 implements no authoritative snapshot installation.
 
 ## Recovery state machine
 

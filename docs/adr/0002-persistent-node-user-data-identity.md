@@ -1,6 +1,6 @@
 # ADR 0002: Use persistent node user data as the v1 identity carrier
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-17
 - **Owners:** coophou maintainers
 - **Supersedes:** None
@@ -42,6 +42,12 @@ Paths remain diagnostic only.
 - reset lookup caches on scene replacement.
 
 ## Limitations
+
+Phase 2 proves the identity semantics in the fake scene: `entity_id` is the
+only lookup key, paths are derived diagnostics, copied payloads require unique
+repaired IDs, deleted IDs become session tombstones, and path reuse cannot
+redirect an old operation. Persisting and repairing `coophou.entity_id` in a
+real Houdini scene remains Phase 3 adapter work.
 
 Network boxes, sticky notes, dots, APEX items, and other objects without a proven equivalent identity mechanism are not covered by this ADR.
 

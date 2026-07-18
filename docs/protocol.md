@@ -1,6 +1,8 @@
 # Network protocol
 
-This document defines recommended protocol properties. Exact field names are **Proposed** until verified or accepted through an ADR.
+This document defines recommended network protocol properties. Exact framing
+and network message names remain **Proposed**. Phase 2 implements only portable
+versioned records and deliberately defines no TCP framing.
 
 ## Goals
 
@@ -107,11 +109,15 @@ Recommended conceptual message types:
 
 ### Operations
 
-- `operation.submit`
-- `operation.accepted`
-- `operation.rejected`
-- `operation.batch`
-- `operation.ack`
+- `transaction.submit`
+- `transaction.accepted`
+- `transaction.rejected`
+- `transaction.ack`
+
+Phase 2's concrete records are `Transaction`, `AcceptedTransaction`, and
+`RejectedTransaction`. A transaction contains ordered explicit operations and
+receives one canonical sequence when accepted. The authority does not sequence
+the enclosed operations independently.
 
 ### Resume and history
 
@@ -138,7 +144,15 @@ Exact names may differ. Their semantic separation should remain.
 
 ## Operation payload
 
-Conceptual submitted operation:
+The portable schema version is 1. It has explicit variants for node create,
+copied-subtree create, subtree delete, rename, final position, destination input
+set, and complete raw parameter tuple set. `EntityRef.entity_id` is
+authoritative; `last_known_path` is optional diagnostic data. Unknown fields,
+versions, and operation variants fail closed. Serialization uses sorted-key,
+compact JSON for deterministic tests, but cross-language canonical byte hashing
+is not a Phase 2 contract.
+
+Conceptual submitted operation inside a `Transaction.operations` array:
 
 ```json
 {
@@ -161,16 +175,18 @@ Conceptual submitted operation:
 }
 ```
 
-Conceptual accepted operation adds:
+Conceptual `AcceptedTransaction` wraps the submitted transaction and adds:
 
 ```json
 {
+  "transaction": {"transaction_id": "transaction-uuid", "operations": ["..."]},
   "canonical_sequence": 1842,
   "accepted_by": "authority-id"
 }
 ```
 
-The authority should not rewrite operation identity. If it normalizes payload fields, the canonical form must remain traceable to the submitted operation.
+The authority does not rewrite transaction or operation identity. It sequences
+the transaction as one unit; operation array order is immutable.
 
 ## Acknowledgements
 
@@ -197,20 +213,26 @@ A reconnecting client should send:
 - client ID;
 - last confirmed canonical sequence;
 - last known checkpoint/snapshot ID;
-- pending local operation IDs;
+- pending local transaction IDs;
 - protocol version;
 - a new connection generation.
 
 The authority responds with one of:
 
-- missing accepted operation range;
-- no missing operations;
+- missing accepted transaction range;
+- no missing transactions;
 - history unavailable, snapshot required;
 - session no longer exists;
 - incompatible protocol;
 - client identity rejected.
 
-A client must not declare synchronized until missing history is applied and pending local operations are resolved.
+A client must not declare synchronized until missing history is applied and pending local transactions are resolved.
+
+The Phase 2 authority returns a contiguous tuple strictly after
+`after_sequence`, an empty successful result at the current head, or an
+explicit `HISTORY_UNAVAILABLE`, `HISTORY_GAP`, or missing-session result.
+History and deduplication are bounded. Snapshot transfer and wire framing remain
+outside this milestone.
 
 ## Versioning
 

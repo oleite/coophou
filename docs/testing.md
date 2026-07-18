@@ -67,6 +67,11 @@ Cover:
 
 These tests should be fast and deterministic.
 
+Phase 2 implements these tests in `test_core_models.py`,
+`test_core_scene.py`, `test_core_authority_client.py`, and
+`test_core_transport_convergence.py`. They run under standard-library
+`unittest` in ordinary Python; no property-testing dependency was added.
+
 ### 2. Fake scene adapter
 
 Implement a small in-memory model with the minimum semantics needed to test collaboration:
@@ -82,7 +87,10 @@ Implement a small in-memory model with the minimum semantics needed to test coll
 - scene generation;
 - apply suppression.
 
-The fake adapter must not attempt to recreate all of Houdini. It exists to test operation contracts and state machines without a license or GUI.
+The implemented `FakeScene` intentionally models only the seven accepted
+families. Transaction application is clone/apply/validate/swap, its semantic
+snapshot is stable JSON-compatible data, and applied transaction replay memory
+is bounded. It does not attempt to recreate Houdini cooking or UI state.
 
 ### 3. Transport simulation
 
@@ -100,6 +108,12 @@ Use an in-process or fake transport capable of:
 - backpressure.
 
 Tests should control the scheduler or clock. Avoid real sleeps.
+
+`DeterministicTransport` uses an explicit bounded event list with manual
+deliver, drop, duplicate, and reorder controls. It creates no ports, threads,
+clocks, or sleeps. Tests cover old connection generations, reconnect/resume,
+queue overflow, unavailable retained history, and failures injected between
+transaction operations.
 
 ### 4. Multi-client convergence tests
 

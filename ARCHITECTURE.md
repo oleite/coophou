@@ -51,6 +51,19 @@ A correct design must account for:
 
 ## Architectural objective
 
+### Phase 2 implemented boundary
+
+`coophou/core/` is the Houdini-independent reference collaboration core. Its
+dependency direction is models/errors → fake scene → authority/client → fake
+transport. It imports no Houdini, Qt, HDK/native binding, socket, or legacy
+relay module and creates no runtime singleton.
+
+The implemented authority owns an abstract supported-state projection per
+session and assigns one canonical sequence per atomic transaction. Each client
+owns separate confirmed and optimistic projections. These are portable
+reference semantics for later adapters, not evidence that a Houdini adapter or
+network authority exists.
+
 ## Feasibility position
 
 **Required:** coophou targets a supported node-authoring subset, not arbitrary Houdini state.
@@ -182,7 +195,7 @@ Responsibilities:
 
 - accept or reject protocol-valid messages;
 - assign monotonically increasing canonical sequence values;
-- broadcast accepted operations;
+- broadcast accepted transactions;
 - support resume from a known sequence;
 - retain enough history or provide an authoritative snapshot path;
 - prevent cross-session data leakage;
@@ -257,7 +270,7 @@ Examples:
 | Connection generation | client session |
 | Last confirmed sequence | client session/recovery state |
 | Canonical next sequence | session authority |
-| Applied operation IDs | application/recovery store |
+| Applied accepted transaction IDs | application/recovery store |
 | Houdini entity lookup cache | Houdini adapter |
 | Remote-apply suppression depth | Houdini application context |
 | UI label text | presentation layer |
@@ -272,11 +285,12 @@ Prefer explicit immutable or append-only records for network history and state t
 Useful conceptual records include:
 
 - `Operation`
+- `Transaction`
 - `EntityRef`
 - `MessageEnvelope`
-- `AcceptedOperation`
-- `RejectedOperation`
-- `PendingLocalOperation`
+- `AcceptedTransaction`
+- `RejectedTransaction`
+- `PendingLocalTransaction`
 - `ApplyResult`
 - `RecoveryCheckpoint`
 - `ClientHealth`

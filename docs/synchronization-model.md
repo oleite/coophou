@@ -4,7 +4,9 @@ This document defines the conceptual model that coophou implementations should p
 
 ## Goal
 
-For every supported operation, clients that begin from a compatible checkpoint and successfully consume the same canonical operation sequence should converge to equivalent synchronized state.
+For every supported transaction, clients that begin from a compatible
+checkpoint and successfully consume the same canonical transaction sequence
+should converge to equivalent synchronized state.
 
 This guarantee requires more than broadcasting callbacks. It requires identity, ordering, idempotency, dependency handling, and recovery.
 
@@ -17,7 +19,7 @@ The most important distinction is:
 - a **Houdini event** is an observation emitted by the DCC;
 - an **operation** is a validated semantic collaborative edit;
 - a **message** is a transport envelope;
-- an **accepted operation** is an operation assigned canonical session order.
+- an **accepted transaction** is one immutable ordered operation tuple assigned one canonical session sequence.
 
 Do not serialize raw callback arguments as the protocol contract.
 
@@ -35,7 +37,7 @@ A canonical transaction contains:
 - optional user-facing label;
 - local observation range;
 - atomic acceptance result;
-- canonical sequence range or one transaction sequence;
+- exactly one canonical transaction sequence;
 - capability requirements.
 
 Examples:
@@ -125,12 +127,15 @@ Duplicate IDs must never remain authoritative for two live entities in one colla
 
 ## Canonical order
 
-The session authority assigns a monotonically increasing sequence to accepted operations.
+The session authority assigns a monotonically increasing sequence to accepted
+transactions. This choice is implemented for Phase 2: operations inside the
+transaction remain in their submitted tuple order and never receive independent
+canonical sequences.
 
 Conceptually:
 
 ```text
-accepted[1], accepted[2], accepted[3], ...
+accepted_transaction[1], accepted_transaction[2], accepted_transaction[3], ...
 ```
 
 Clients track at least:
@@ -138,7 +143,7 @@ Clients track at least:
 - `last_received_sequence`;
 - `last_applied_sequence`;
 - `last_confirmed_sequence`;
-- pending local operation IDs.
+- pending local transaction IDs.
 
 These may collapse in a simpler implementation, but a gap must remain detectable.
 
@@ -147,15 +152,27 @@ These may collapse in a simpler implementation, but a gap must remain detectable
 When receiving canonical sequence `N`:
 
 - if `N == last_applied + 1`, it is eligible for normal processing;
-- if `N <= last_applied`, treat it as duplicate or replay and verify operation identity;
+- if `N <= last_applied`, treat it as duplicate or replay and verify transaction identity and immutable content;
 - if `N > last_applied + 1`, enter catch-up or degraded state and request missing history;
-- if the same sequence maps to a different operation ID, treat it as protocol corruption or authority inconsistency.
+- if the same sequence maps to different transaction content, or one transaction ID appears at two sequences, enter `FATAL` as authority contradiction.
 
 Do not apply later operations across a known gap unless the protocol explicitly proves they are independent and the recovery design supports it.
 
 ## Local optimistic lifecycle
 
 A local Houdini edit is already visible before network confirmation. coophou therefore needs an explicit optimistic model.
+
+Phase 2 makes this two projections rather than one scene plus flags:
+
+- `confirmed_scene` is the successfully applied contiguous canonical prefix;
+- `working_scene` is a deterministic clone of `confirmed_scene` with remaining
+  local pending transactions replayed in submission order.
+
+Canonical acceptance and rejection both rebuild `working_scene`. If any pending
+transaction cannot reapply, it remains recorded and the client enters
+`RECONCILIATION_REQUIRED`. The Phase 2 offline policy disallows new local
+submissions while disconnected or while a canonical gap/recovery state exists;
+already pending transactions survive reconnect with their original IDs.
 
 Recommended conceptual flow:
 
@@ -181,9 +198,9 @@ A pending record should preserve:
 
 ### Confirmation
 
-When the canonical stream returns the client's own operation:
+When the canonical stream returns the client's own transaction:
 
-- match by operation ID, not by payload resemblance;
+- match by transaction ID, not by payload resemblance;
 - do not apply it twice if the local edit already produced equivalent state;
 - validate that canonical placement does not require rebase or replay;
 - advance confirmation state only after local state is consistent.

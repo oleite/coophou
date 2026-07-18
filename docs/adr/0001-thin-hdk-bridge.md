@@ -1,6 +1,6 @@
 # ADR 0001: Keep the HDK bridge thin
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-17
 - **Owners:** coophou maintainers
 - **Supersedes:** None
@@ -37,6 +37,12 @@ Keep these in portable code:
 The bridge emits plain observations through a narrow versioned interface. It never owns canonical state.
 
 ## Consequences
+
+Phase 2 implements the operation, transaction, authority, client recovery, and
+fault-simulation logic in `coophou/core/`. Importing that package in ordinary
+Python loads no `hou`, Qt, socket, or native-binding dependency. This is direct
+evidence that the portable/native boundary in this decision is workable; the
+Phase 1 DSO remains an observation probe and owns no canonical state.
 
 ### Positive
 

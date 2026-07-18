@@ -65,22 +65,29 @@ No collaboration network is required yet.
 
 ## Phase 2 — portable deterministic core
 
+**Status: complete (2026-07-17).** See `docs/phase-2-report.md`.
+
 Implement without Houdini:
 
 - operation and transaction schemas;
 - entity references;
 - canonical sequence state machine;
-- pending local operations;
+- pending local transactions;
 - duplicate detection;
 - capability handshake;
 - fake scene adapter;
 - fake authority and transport;
-- recovery states;
-- transient presence model.
+- recovery states.
+
+Transient presence remains deferred because it is explicitly outside the Phase
+2 durable-core milestone.
 
 ### Exit gate
 
-Property-based and multi-client tests converge under duplicate, dropped, delayed, reordered, rejected, and reconnect scenarios.
+Deterministic unit, multi-client, and seeded randomized tests pass under
+duplicate, dropped, delayed, reordered, rejected, gap, reconnect,
+history-unavailable, queue-overflow, and atomic mid-transaction failure
+scenarios. The core imports without Houdini. Phase 3 is not started.
 
 ## Phase 3 — single-process Houdini adapter
 

@@ -5,6 +5,7 @@ This document defines the recommended release scope. “Possible in Houdini” d
 ## Statuses
 
 - **v1 candidate**: implement after the event probe and contract tests pass.
+- **portable v1 contract**: strict Phase 2 domain/fake-scene behavior is implemented; real Houdini capture/application remains unverified until Phase 3.
 - **v1 optional**: useful, but may be cut without weakening the core experience.
 - **later**: requires a richer identity, transaction, or conflict model.
 - **personal state**: presence-only or intentionally local; never durable scene synchronization.
@@ -31,6 +32,10 @@ These results come from fresh headless `hython` processes and do not promote any
 
 ## v1 candidate operations
 
+Phase 2 promotes the seven rows below to **portable v1 contract** status only.
+That status does not claim a production Houdini adapter. Connect and disconnect
+share one explicit destination-input operation.
+
 | Operation | Identity | Capture concerns | Apply concerns | Conflict rule |
 |---|---|---|---|---|
 | Create one node | New node ID + parent ID | Parent `ChildCreated`; exact initialization may span callbacks | Exact type/name/position; operator availability | Canonical transaction; authority resolves final name |
@@ -41,7 +46,6 @@ These results come from fresh headless `hython` processes and do not promote any
 | Connect input | Source/destination IDs + connector indices | `InputRewired` reports destination input | Validate operator and connector range | Later canonical connection wins or fails precondition |
 | Disconnect input | Destination ID + input index + expected source | Must capture previous source | Disconnect only expected connection | Identity/precondition mismatch requires recovery |
 | Simple parameter tuple set | Node ID + tuple name | `parm_tuple` may be `None`; high-frequency UI edits | Preserve raw typed value, not evaluated expression | Later canonical value wins |
-| Selected node flags | Node ID + explicit flag | One callback may cover several flags | Apply allowlisted flags only | Later canonical flag value wins |
 
 ## Definition of “simple parameter”
 
